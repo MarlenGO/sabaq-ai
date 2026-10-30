@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { NavBar } from "@/components/ui/NavBar";
+import { preferencesScript } from "@/lib/preferences-script";
 import "./globals.css";
 
 // Запасной шрифт для устройств без SF Pro (Windows, Android).
@@ -17,7 +18,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="kk" className={`${inter.variable} h-full`}>
+    // suppressHydrationWarning: скрипт ниже меняет атрибуты <html> до React,
+    // и это ожидаемое расхождение с серверной версией
+    <html lang="kk" className={`${inter.variable} h-full`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: preferencesScript }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <NavBar />
         {children}

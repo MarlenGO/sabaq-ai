@@ -1,73 +1,214 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { Language } from "@/types/topic-package";
+import { useStoredState } from "@/lib/stored-state";
+import { useVoiceInput } from "@/lib/voice-input";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { GameIcon, MicIcon, SlidesIcon, SparkleIcon } from "@/components/ui/Icons";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
+
+type Output = "slides" | "game";
+
+interface Draft {
+  topic: string;
+  grade: number;
+  language: Language;
+  output: Output;
+}
+
+const emptyDraft: Draft = { topic: "", grade: 7, language: "kk", output: "slides" };
 
 const grades = Array.from({ length: 11 }, (_, i) => i + 1);
 
-// Форма «тема + класс + язык». Кнопки генерации заработают на этапе 3,
-// пока форма только хранит введённые значения.
+const exampleTopics: Record<Language, string[]> = {
+  kk: ["Ньютонның бірінші заңы", "Фотосинтез", "Абай Құнанбайұлы", "Жасуша құрылысы"],
+  ru: ["Первый закон Ньютона", "Фотосинтез", "Абай Кунанбаев", "Строение клетки"],
+};
+
+// Пошаговая форма: каждый шаг с номером и понятным вопросом.
+// Всё введённое сохраняется автоматически (см. useStoredState).
 export function TopicForm() {
-  const [topic, setTopic] = useState("");
-  const [grade, setGrade] = useState(7);
-  const [language, setLanguage] = useState<Language>("kk");
+  const [draft, setDraft] = useStoredState("sabaq-draft", emptyDraft);
+  const [submitted, setSubmitted] = useState(false);
+  const update = (patch: Partial<Draft>) => {
+    setDraft({ ...draft, ...patch });
+    setSubmitted(false);
+  };
+
+  const voice = useVoiceInput(draft.language, (text) => update({ topic: text }));
+  const hasTopic = draft.topic.trim().length > 0;
 
   return (
-    <Card className="p-5 sm:p-6">
-      <div className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium text-label-2">Сабақтың тақырыбы</span>
-          <input
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            placeholder="Мысалы: Ньютонның бірінші заңы"
-            className="h-11 rounded-xl bg-fill px-4 text-[17px] outline-none placeholder:text-label-3 focus:ring-4 focus:ring-accent/25"
-          />
-        </label>
-
-        <div className="flex flex-wrap items-end gap-4">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-label-2">Сынып</span>
-            <select
-              value={grade}
-              onChange={(e) => setGrade(Number(e.target.value))}
-              className="h-11 rounded-xl bg-fill px-4 text-[17px] outline-none focus:ring-4 focus:ring-accent/25"
-            >
-              {grades.map((g) => (
-                <option key={g} value={g}>
-                  {g}-сынып
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-label-2">Тіл</span>
-            <div className="flex h-11 items-center">
-              <SegmentedControl
-                value={language}
-                onChange={setLanguage}
-                options={[
-                  { value: "kk", label: "Қазақша" },
-                  { value: "ru", label: "Русский" },
-                ]}
-              />
-            </div>
+    <Card className="p-5 sm:p-8">
+      <form
+        className="flex flex-col gap-8"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setSubmitted(true);
+        }}
+      >
+        <Step n={1} title="Сабақтың тақырыбын жазыңыз">
+          <div className="relative">
+            <input
+              value={draft.topic}
+              onChange={(e) => update({ topic: e.target.value })}
+              placeholder={exampleTopics[draft.language][0]}
+              aria-label="Сабақтың тақырыбы"
+              className="h-14 w-full rounded-2xl bg-fill pl-5 pr-16 text-body outline-none placeholder:text-label-3 focus:ring-4 focus:ring-accent/25"
+            />
+            {voice.supported && (
+              <button
+                type="button"
+                onClick={voice.listening ? voice.stop : voice.start}
+                aria-label={voice.listening ? "Тыңдауды тоқтату" : "Дауыспен айту"}
+                title="Дауыспен айту"
+                className={`absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-xl transition ${
+                  voice.listening ? "animate-pulse bg-red text-white" : "text-accent hover:bg-accent/12"
+                }`}
+              >
+                <MicIcon />
+              </button>
+            )}
           </div>
-        </div>
+          {voice.listening && <p className="mt-2 text-subhead text-red">Тыңдап тұрмын… тақырыпты айтыңыз</p>}
 
-        <div className="flex flex-col gap-2 pt-1 sm:flex-row">
-          <Button disabled={!topic.trim()} className="sm:flex-1">
-            Дайын слайд жасау
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-footnote text-label-2">Мысалы:</span>
+            {exampleTopics[draft.language].map((topic) => (
+              <button
+                key={topic}
+                type="button"
+                onClick={() => update({ topic })}
+                className="rounded-full bg-accent/10 px-3.5 py-1.5 text-footnote font-medium text-accent transition hover:bg-accent/20"
+              >
+                {topic}
+              </button>
+            ))}
+          </div>
+        </Step>
+
+        <Step n={2} title="Сынып пен тілді таңдаңыз">
+          <div role="radiogroup" aria-label="Сынып" className="flex flex-wrap gap-2">
+            {grades.map((grade) => {
+              const selected = grade === draft.grade;
+              return (
+                <button
+                  key={grade}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  aria-label={`${grade}-сынып`}
+                  onClick={() => update({ grade })}
+                  className={`h-11 min-w-11 rounded-full px-3 text-callout font-semibold transition ${
+                    selected ? "bg-accent text-white shadow-sm" : "bg-fill text-label hover:bg-accent/15"
+                  }`}
+                >
+                  {grade}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-4">
+            <SegmentedControl
+              size="lg"
+              ariaLabel="Тіл"
+              value={draft.language}
+              onChange={(language) => update({ language })}
+              options={[
+                { value: "kk", label: "Қазақша" },
+                { value: "ru", label: "Русский" },
+              ]}
+            />
+          </div>
+        </Step>
+
+        <Step n={3} title="Не жасаймыз?">
+          <div role="radiogroup" aria-label="Нәтиже" className="grid gap-3 sm:grid-cols-2">
+            <OutputTile
+              selected={draft.output === "slides"}
+              onSelect={() => update({ output: "slides" })}
+              icon={<SlidesIcon />}
+              tint="bg-accent"
+              title="Презентация"
+              text="Дайын слайдтар, PowerPoint-ке жүктеуге болады"
+            />
+            <OutputTile
+              selected={draft.output === "game"}
+              onSelect={() => update({ output: "game" })}
+              icon={<GameIcon />}
+              tint="bg-purple"
+              title="Ойын"
+              text="Викторина, «жұбын тап» — оқушылар телефоннан ойнайды"
+            />
+          </div>
+        </Step>
+
+        <div className="flex flex-col gap-3">
+          <Button type="submit" size="lg" disabled={!hasTopic} className="w-full">
+            <SparkleIcon />
+            {draft.output === "slides" ? "Дайын слайд жасау" : "Дайын ойын жасау"}
           </Button>
-          <Button variant="tinted" disabled={!topic.trim()} className="sm:flex-1">
-            Дайын ойын жасау
-          </Button>
+          <p className="text-center text-footnote text-label-2">
+            {hasTopic
+              ? "Барлығы автоматты түрде сақталады — бетті жауып қойсаңыз да жоғалмайды"
+              : "Бастау үшін тақырыпты жазыңыз немесе мысалды басыңыз"}
+          </p>
+          {submitted && (
+            <div role="status" className="rounded-2xl bg-orange/12 p-4 text-subhead">
+              Бұл батырма жақында іске қосылады. Әзірге төмендегі{" "}
+              <a href="#example" className="font-semibold text-accent underline-offset-2 hover:underline">
+                дайын мысалды
+              </a>{" "}
+              қарап шығыңыз.
+            </div>
+          )}
         </div>
-      </div>
+      </form>
     </Card>
+  );
+}
+
+function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
+  return (
+    <fieldset>
+      <legend className="mb-3 flex items-center gap-3 text-title3 font-semibold">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-callout font-bold text-white">
+          {n}
+        </span>
+        {title}
+      </legend>
+      {children}
+    </fieldset>
+  );
+}
+
+function OutputTile(props: {
+  selected: boolean;
+  onSelect: () => void;
+  icon: ReactNode;
+  tint: string;
+  title: string;
+  text: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={props.selected}
+      onClick={props.onSelect}
+      className={`flex items-start gap-4 rounded-2xl border-2 p-4 text-left transition ${
+        props.selected ? "border-accent bg-accent/6" : "border-transparent bg-fill hover:border-separator"
+      }`}
+    >
+      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white ${props.tint}`}>
+        {props.icon}
+      </span>
+      <span>
+        <span className="block text-body font-semibold">{props.title}</span>
+        <span className="mt-0.5 block text-footnote text-label-2">{props.text}</span>
+      </span>
+    </button>
   );
 }
