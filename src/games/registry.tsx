@@ -15,6 +15,8 @@ export interface GameTemplate {
   tint: string;
   /** Какую часть пакета темы использует игра */
   data: "quiz" | "trueFalse" | "jeopardy";
+  /** Можно ли играть через QR, каждый со своего телефона (см. RoomHost) */
+  qr: boolean;
 }
 
 export const games: GameTemplate[] = [
@@ -25,6 +27,7 @@ export const games: GameTemplate[] = [
     icon: <ListCheckIcon />,
     tint: "bg-green",
     data: "quiz",
+    qr: true,
   },
   {
     id: "quiz",
@@ -33,6 +36,7 @@ export const games: GameTemplate[] = [
     icon: <TimerIcon />,
     tint: "bg-purple",
     data: "quiz",
+    qr: true,
   },
   {
     id: "jeopardy",
@@ -41,6 +45,8 @@ export const games: GameTemplate[] = [
     icon: <GridIcon />,
     tint: "bg-orange",
     data: "jeopardy",
+    // Командная игра у доски: через телефоны в неё играть неудобно
+    qr: false,
   },
   {
     id: "true-false",
@@ -49,5 +55,6 @@ export const games: GameTemplate[] = [
     icon: <CheckIcon />,
     tint: "bg-teal",
     data: "trueFalse",
+    qr: true,
   },
 ];

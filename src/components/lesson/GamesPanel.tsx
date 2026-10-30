@@ -11,6 +11,25 @@ import { JeopardyEditor, QuizEditor, TrueFalseEditor } from "@/components/games/
 import { JeopardyBoard } from "@/components/games/JeopardyBoard";
 import { QuestionPlayer } from "@/components/games/QuestionPlayer";
 import { TrueFalsePlayer } from "@/components/games/TrueFalsePlayer";
+import { RoomHost } from "@/components/games/RoomHost";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import type { RoomGame } from "@/types/room";
+
+const ScreenIcon = () => (
+  <svg viewBox="0 0 24 24" width="1.25em" height="1.25em" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+    <rect x="3" y="4" width="18" height="12" rx="2" />
+    <path d="M8 20h8M12 16v4" />
+  </svg>
+);
+
+const QrIcon = () => (
+  <svg viewBox="0 0 24 24" width="1.25em" height="1.25em" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <path d="M14 14h3v3M21 14v.01M14 21h.01M17 21h4v-4" />
+  </svg>
+);
 
 interface GamesPanelProps {
   lesson: TopicPackage;
@@ -22,7 +41,9 @@ interface GamesPanelProps {
 
 export function GamesPanel({ lesson, mode, onChange, onJeopardyReady }: GamesPanelProps) {
   const [gameId, setGameId] = useState<GameId>("test");
+  const [playMode, setPlayMode] = useState<"screen" | "qr">("screen");
   const game = games.find((g) => g.id === gameId) ?? games[0];
+  const viaQr = game.qr && playMode === "qr";
 
   return (
     <div className="flex flex-col gap-5">
@@ -52,10 +73,41 @@ export function GamesPanel({ lesson, mode, onChange, onJeopardyReady }: GamesPan
         })}
       </div>
 
+      {mode === "preview" && (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-subhead font-semibold">Қалай ойнаймыз?</span>
+          {game.qr ? (
+            <SegmentedControl
+              size="lg"
+              ariaLabel="Ойнау тәсілі"
+              value={playMode}
+              onChange={setPlayMode}
+              options={[
+                { value: "screen", label: "Экранда", icon: <ScreenIcon /> },
+                { value: "qr", label: "QR арқылы", icon: <QrIcon /> },
+              ]}
+            />
+          ) : (
+            <span className="text-subhead text-label-2">Тек экранда — командалармен</span>
+          )}
+          <span className="w-full text-footnote text-label-2">
+            {viaQr
+              ? "Әр оқушы өз телефонынан жауап береді, нәтижелер кестеде шығады"
+              : "Сұрақтар проекторда шығады, оқушылар ауызша жауап береді"}
+          </span>
+        </div>
+      )}
+
       {game.data === "jeopardy" && !lesson.jeopardy ? (
         <JeopardyGenerator lessonId={lesson.id} onReady={onJeopardyReady} />
       ) : mode === "edit" ? (
         <GameEditor lesson={lesson} gameData={game.data} onChange={onChange} />
+      ) : viaQr ? (
+        <GameStage key={`qr-${game.id}`}>
+          <div className="pt-10">
+            <RoomHost lessonId={lesson.id} game={game.id as RoomGame} />
+          </div>
+        </GameStage>
       ) : (
         // key: при смене игры плеер начинается заново
         <GameStage key={game.id}>
