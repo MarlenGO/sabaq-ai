@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { topicPackageSchema, type TopicPackage } from "@/types/topic-package";
 import { languageNames, subjectNames } from "@/lib/labels";
-import { Button } from "@/components/ui/Button";
+import { getTemplate } from "@/slides/templates";
 import { Card } from "@/components/ui/Card";
 import { ArrowLeftIcon, CheckIcon, EyeIcon, GameIcon, PencilIcon, SlidesIcon } from "@/components/ui/Icons";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { PackageEditor } from "@/components/slides/PackageEditor";
 import { SlidePreview } from "@/components/slides/SlidePreview";
+import { DownloadPptxButton } from "@/components/slides/DownloadPptxButton";
+import { TemplatePicker } from "@/components/slides/TemplatePicker";
 import { GamesPanel } from "./GamesPanel";
 
 type Tab = "slides" | "games";
@@ -101,20 +103,28 @@ export function LessonWorkspace({ initial, initialTab }: { initial: TopicPackage
 
       <div className="mt-6">
         {tab === "slides" ? (
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-6">
             {mode === "edit" ? (
-              <Card className="p-4 sm:p-6">
-                <PackageEditor pkg={lesson} onChange={update} />
-              </Card>
+              <>
+                <Card className="p-4 sm:p-6">
+                  <PackageEditor pkg={lesson} onChange={update} />
+                </Card>
+                <DownloadPptxButton pkg={lesson} />
+              </>
             ) : (
-              <SlidePreview pkg={lesson} />
+              <>
+                <section>
+                  <h2 className="mb-3 text-title3 font-semibold">Шаблонды таңдаңыз</h2>
+                  <TemplatePicker
+                    pkg={lesson}
+                    value={getTemplate(lesson.templateId, lesson.subject).id}
+                    onChange={(templateId) => update({ ...lesson, templateId })}
+                  />
+                </section>
+                <DownloadPptxButton pkg={lesson} />
+                <SlidePreview pkg={lesson} />
+              </>
             )}
-            <div className="flex flex-col items-start gap-1">
-              <Button size="lg" disabled>
-                PPTX жүктеу
-              </Button>
-              <span className="text-footnote text-label-2">PowerPoint-ке жүктеу келесі кезеңде қосылады</span>
-            </div>
           </div>
         ) : (
           <GamesPanel

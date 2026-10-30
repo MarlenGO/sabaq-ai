@@ -98,6 +98,8 @@ export const topicPackageSchema = packageContentSchema.extend({
   createdAt: z.string(),
   updatedAt: z.string(),
   jeopardy: jeopardySchema.optional(),
+  /** Выбранный шаблон презентации; если нет — подбирается по предмету */
+  templateId: z.string().optional(),
 });
 
 export type Language = z.infer<typeof languageSchema>;
