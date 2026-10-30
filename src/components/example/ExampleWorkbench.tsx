@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EyeIcon, PencilIcon } from "@/components/ui/Icons";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { PackageEditor } from "./PackageEditor";
-import { SlidePreview } from "./SlidePreview";
+import { PackageEditor } from "@/components/slides/PackageEditor";
+import { SlidePreview } from "@/components/slides/SlidePreview";
 
 type Mode = "edit" | "preview";
 

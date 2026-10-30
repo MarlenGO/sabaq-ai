@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import type { Subject, TopicPackage } from "@/types/topic-package";
+import type { TopicPackage } from "@/types/topic-package";
+import { subjectNames } from "@/lib/labels";
 
 // Временный набросок шаблона «Ғылым». На этапе 3 его цвета переедут
 // в конфиг шаблонов, а слайды начнут строиться по раскладкам.
@@ -11,16 +12,6 @@ const scienceTemplate = {
   muted: "rgb(255 255 255 / 0.72)",
   accent: "#7dd3fc",
   panel: "rgb(255 255 255 / 0.12)",
-};
-
-const subjectNames: Record<Subject, string> = {
-  physics: "Физика",
-  chemistry: "Химия",
-  biology: "Биология",
-  history: "Тарих",
-  geography: "География",
-  math: "Математика",
-  other: "Пән",
 };
 
 // Шрифты в слайде заданы в cqw (процент ширины слайда),

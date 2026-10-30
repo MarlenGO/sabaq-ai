@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import type { Language } from "@/types/topic-package";
 import { useStoredState } from "@/lib/stored-state";
@@ -30,15 +31,34 @@ const exampleTopics: Record<Language, string[]> = {
 // Пошаговая форма: каждый шаг с номером и понятным вопросом.
 // Всё введённое сохраняется автоматически (см. useStoredState).
 export function TopicForm() {
+  const router = useRouter();
   const [draft, setDraft] = useStoredState("sabaq-draft", emptyDraft);
-  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const update = (patch: Partial<Draft>) => {
     setDraft({ ...draft, ...patch });
-    setSubmitted(false);
+    setError(null);
   };
 
   const voice = useVoiceInput(draft.language, (text) => update({ topic: text }));
-  const hasTopic = draft.topic.trim().length > 0;
+  const hasTopic = draft.topic.trim().length >= 2;
+
+  const submit = async () => {
+    setLoading(true);
+    setError(null);
+    const response = await fetch("/api/lessons", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic: draft.topic, grade: draft.grade, language: draft.language }),
+    }).catch(() => null);
+    const data = await response?.json().catch(() => null);
+    if (response?.ok && data?.id) {
+      router.push(`/lesson/${data.id}?tab=${draft.output === "slides" ? "slides" : "games"}`);
+      return; // кнопка остаётся в состоянии «жасап жатырмын», пока открывается урок
+    }
+    setLoading(false);
+    setError(data?.error ?? "Байланыс үзілді. Интернетті тексеріп, қайталап көріңіз.");
+  };
 
   return (
     <Card className="p-5 sm:p-8">
@@ -46,7 +66,7 @@ export function TopicForm() {
         className="flex flex-col gap-8"
         onSubmit={(e) => {
           e.preventDefault();
-          setSubmitted(true);
+          if (!loading) submit();
         }}
       >
         <Step n={1} title="Сабақтың тақырыбын жазыңыз">
@@ -146,22 +166,22 @@ export function TopicForm() {
         </Step>
 
         <div className="flex flex-col gap-3">
-          <Button type="submit" size="lg" disabled={!hasTopic} className="w-full">
-            <SparkleIcon />
-            {draft.output === "slides" ? "Дайын слайд жасау" : "Дайын ойын жасау"}
+          <Button type="submit" size="lg" disabled={!hasTopic || loading} className="w-full">
+            <SparkleIcon className={loading ? "animate-spin" : ""} />
+            {loading
+              ? "Жасап жатырмын… 10–20 секунд"
+              : draft.output === "slides"
+                ? "Дайын слайд жасау"
+                : "Дайын ойын жасау"}
           </Button>
           <p className="text-center text-footnote text-label-2">
             {hasTopic
               ? "Барлығы автоматты түрде сақталады — бетті жауып қойсаңыз да жоғалмайды"
               : "Бастау үшін тақырыпты жазыңыз немесе мысалды басыңыз"}
           </p>
-          {submitted && (
-            <div role="status" className="rounded-2xl bg-orange/12 p-4 text-subhead">
-              Бұл батырма жақында іске қосылады. Әзірге төмендегі{" "}
-              <a href="#example" className="font-semibold text-accent underline-offset-2 hover:underline">
-                дайын мысалды
-              </a>{" "}
-              қарап шығыңыз.
+          {error && (
+            <div role="alert" className="rounded-2xl bg-red/10 p-4 text-subhead text-red">
+              {error}
             </div>
           )}
         </div>

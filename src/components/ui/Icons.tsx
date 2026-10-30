@@ -94,7 +94,47 @@ export const CheckIcon = (p: IconProps) => (
   </Icon>
 );
 
-export const TextSizeIcon = (p: IconProps) => (
+export const XIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M6 6l12 12M18 6L6 18" />
+  </Icon>
+);
+
+export const GridIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+    <rect x="14" y="14" width="7" height="7" rx="1.5" />
+  </Icon>
+);
+
+export const ListCheckIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 6.5l1.5 1.5L8 5.5M4 12.5l1.5 1.5L8 11.5M4 18.5l1.5 1.5L8 17.5M11 7h9M11 13h9M11 19h9" />
+  </Icon>
+);
+
+export const TimerIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="13" r="8" />
+    <path d="M12 9v4l2.5 2.5M9.5 2.5h5" />
+  </Icon>
+);
+
+export const ExpandIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+  </Icon>
+);
+
+export const ArrowLeftIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M19 12H5M11 6l-6 6 6 6" />
+  </Icon>
+);
+
+export const TextSizeIcon =(p: IconProps) => (
   <Icon {...p}>
     <path d="M3 19l4.5-12L12 19M4.7 14.5h5.6M14 19l3.5-9 3.5 9M15.2 16h4.6" />
   </Icon>

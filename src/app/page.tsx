@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
+import { RecentLessons } from "@/components/RecentLessons";
 import { TopicForm } from "@/components/TopicForm";
 import { ExampleWorkbench } from "@/components/example/ExampleWorkbench";
 import { Card } from "@/components/ui/Card";
@@ -27,6 +28,10 @@ export default function Home() {
         <div className="-mt-4">
           <TopicForm />
         </div>
+
+        <Suspense>
+          <RecentLessons />
+        </Suspense>
 
         <Section title="Қалай жұмыс істейді?">
           <ol className="grid gap-3 sm:grid-cols-3">

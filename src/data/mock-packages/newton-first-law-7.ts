@@ -2,12 +2,15 @@ import type { TopicPackage } from "@/types/topic-package";
 
 // Написан вручную. Так будет выглядеть ответ Gemini, когда подключим бэкенд.
 export const newtonFirstLaw7: TopicPackage = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   id: "physics-7-newton-first-law-kk",
   topic: "Ньютонның бірінші заңы",
   grade: 7,
   subject: "physics",
   language: "kk",
+  source: "demo",
+  createdAt: "2026-10-30T00:00:00.000Z",
+  updatedAt: "2026-10-30T00:00:00.000Z",
   definition:
     "Егер денеге басқа денелер әсер етпесе немесе олардың әсерлері теңгерілсе, дене тыныштық күйін немесе түзу сызықты бірқалыпты қозғалысын сақтайды.",
   formula: {
