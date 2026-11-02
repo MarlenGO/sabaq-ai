@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { languageSchema } from "./topic-package";
+import { imageSchema, languageSchema } from "./topic-package";
 
 // Игровая комната для режима «через QR». Учитель запускает игру —
 // создаётся комната с кодом из 6 цифр и копией вопросов (чтобы правки
@@ -14,6 +14,7 @@ export const roomQuestionSchema = z.object({
   options: z.array(z.string()).min(2).max(4),
   correctIndex: z.number().int(),
   explanation: z.string().optional(),
+  image: imageSchema.optional(),
 });
 
 export const roomSchema = z.object({

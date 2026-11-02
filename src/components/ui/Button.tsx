@@ -1,14 +1,15 @@
 import type { ButtonHTMLAttributes } from "react";
 
-// Три вида кнопок из iOS: filled — главное действие, tinted — второстепенное,
-// plain — текстовая ссылка.
-type Variant = "filled" | "tinted" | "plain";
+// Виды кнопок из iOS: filled — главное действие, tinted — второстепенное,
+// plain — текстовая ссылка, light — белая кнопка на цветном фоне.
+type Variant = "filled" | "tinted" | "plain" | "light";
 type Size = "md" | "lg";
 
 const variants: Record<Variant, string> = {
   filled: "bg-accent text-white hover:bg-accent-pressed",
   tinted: "bg-accent/12 text-accent hover:bg-accent/20",
   plain: "text-accent hover:opacity-70",
+  light: "bg-white text-indigo hover:bg-white/90",
 };
 
 const sizes: Record<Size, string> = {

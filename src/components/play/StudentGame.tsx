@@ -7,6 +7,7 @@ import { schoolGrade } from "@/lib/labels";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { CheckIcon, XIcon } from "@/components/ui/Icons";
+import { RemoteImage } from "@/components/ui/RemoteImage";
 import { fieldClass } from "@/components/ui/field";
 
 // Игра на телефоне ученика: ввести имя и ответить на вопросы в своём темпе.
@@ -238,8 +239,9 @@ function QuestionCard(props: {
         {timed && !answered && <span className="w-10 text-right text-subhead font-semibold tabular-nums">{timeLeft} с</span>}
       </div>
 
-      <Card className="p-5">
+      <Card className="flex flex-col gap-3 p-5">
         <h2 className="text-title2 font-bold">{question.prompt}</h2>
+        {question.image && <RemoteImage image={question.image} className="max-h-60" />}
       </Card>
 
       <div className={`grid gap-3 ${trueFalse ? "grid-cols-2" : ""}`}>

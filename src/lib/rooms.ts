@@ -18,6 +18,7 @@ export function roomQuestions(lesson: TopicPackage, game: RoomGame): RoomQuestio
     options: q.options,
     correctIndex: q.correctIndex,
     explanation: q.explanation || undefined,
+    image: q.image,
   }));
 }
 
@@ -36,7 +37,7 @@ export function toPublicRoom(room: Room): PublicRoom {
     title: room.title,
     language: room.language,
     status: room.status,
-    questions: room.questions.map(({ prompt, options }) => ({ prompt, options })),
+    questions: room.questions.map(({ prompt, options, image }) => ({ prompt, options, image })),
   };
 }
 

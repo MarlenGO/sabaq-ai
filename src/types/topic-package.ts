@@ -40,6 +40,18 @@ export const quizQuestionSchema = z.object({
   explanation: z.string().optional(),
 });
 
+// Картинка к вопросу. Храним только ссылку (строку текста), сам файл
+// остаётся на сайте-источнике (обычно Wikimedia Commons) и базу не занимает.
+// В схемах для AI картинки нет: модель не должна выдумывать ссылки.
+export const imageSchema = z.object({
+  url: z.url({ protocol: /^https$/ }).max(1000),
+  /** Автор и лицензия — Wikimedia просит их указывать */
+  credit: z.string().max(200).optional(),
+});
+
+/** Вопрос теста/викторины, как он хранится: то, что дал AI, + картинка от учителя */
+export const quizItemSchema = quizQuestionSchema.extend({ image: imageSchema.optional() });
+
 export const trueFalseSchema = z.object({
   statement: text,
   isTrue: z.boolean(),
@@ -84,7 +96,21 @@ export const jeopardySchema = z.object({
     .max(5),
 });
 
+// «Өз ойын», как она хранится: вопросы могут быть с картинками
+export const jeopardyStoredSchema = z.object({
+  categories: z
+    .array(
+      z.object({
+        title: text,
+        questions: z.array(z.object({ question: text, answer: text, image: imageSchema.optional() })).length(5),
+      }),
+    )
+    .min(3)
+    .max(5),
+});
+
 export const topicPackageSchema = packageContentSchema.extend({
+  quiz: z.array(quizItemSchema).min(limits.quiz[0]).max(limits.quiz[1]),
   /** Версия схемы: если поменяем структуру, старые сохранённые пакеты можно будет распознать */
   schemaVersion: z.literal(2),
   id: z.string(),
@@ -97,7 +123,7 @@ export const topicPackageSchema = packageContentSchema.extend({
   source: z.enum(["ai", "demo"]),
   createdAt: z.string(),
   updatedAt: z.string(),
-  jeopardy: jeopardySchema.optional(),
+  jeopardy: jeopardyStoredSchema.optional(),
   /** Выбранный шаблон презентации; если нет — подбирается по предмету */
   templateId: z.string().optional(),
 });
@@ -105,10 +131,11 @@ export const topicPackageSchema = packageContentSchema.extend({
 export type Language = z.infer<typeof languageSchema>;
 export type Subject = z.infer<typeof subjectSchema>;
 export type Formula = z.infer<typeof formulaSchema>;
-export type QuizQuestion = z.infer<typeof quizQuestionSchema>;
+export type QuizQuestion = z.infer<typeof quizItemSchema>;
+export type QuestionImage = z.infer<typeof imageSchema>;
 export type TrueFalseStatement = z.infer<typeof trueFalseSchema>;
 export type PackageContent = z.infer<typeof packageContentSchema>;
-export type Jeopardy = z.infer<typeof jeopardySchema>;
+export type Jeopardy = z.infer<typeof jeopardyStoredSchema>;
 export type TopicPackage = z.infer<typeof topicPackageSchema>;
 export type Term = TopicPackage["terms"][number];
 export type Example = TopicPackage["examples"][number];

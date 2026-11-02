@@ -7,6 +7,7 @@ import { CheckIcon, PlusIcon } from "@/components/ui/Icons";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { confirmDelete, fieldClass } from "@/components/ui/field";
 import { DeleteButton } from "@/components/slides/PackageEditor";
+import { ImageField } from "./ImageField";
 
 // Конструкторы игр. Каждый правит свою часть пакета темы:
 // QuizEditor — вопросы для «Теста» и «Викторины», TrueFalseEditor — утверждения,
@@ -25,7 +26,8 @@ export function QuizEditor({ questions, onChange }: { questions: QuizQuestion[];
   return (
     <div className="flex flex-col gap-4">
       <p className="text-subhead text-label-2">
-        Бұл сұрақтар «Тест» пен «Викторинада» бірдей. Дұрыс жауапты сол жақтағы дөңгелекпен белгілеңіз.
+        Бұл сұрақтар «Тест» пен «Викторинада» бірдей. Дұрыс жауапты сол жақтағы дөңгелекпен белгілеңіз. Сұраққа
+        сурет те қосуға болады.
       </p>
       {questions.map((q, qi) => {
         const set = (patch: Partial<QuizQuestion>) => onChange(replaceAt(questions, qi, { ...q, ...patch }));
@@ -46,6 +48,7 @@ export function QuizEditor({ questions, onChange }: { questions: QuizQuestion[];
               placeholder="Сұрақ"
               onChange={(e) => set({ question: e.target.value })}
             />
+            <ImageField image={q.image} query={q.question} onChange={(image) => set({ image })} />
             <div role="radiogroup" aria-label="Дұрыс жауап" className="flex flex-col gap-2">
               {q.options.map((option, oi) => {
                 const isCorrect = oi === q.correctIndex;
@@ -186,6 +189,12 @@ export function JeopardyEditor({ jeopardy, onChange }: { jeopardy: Jeopardy; onC
                 <span className="mt-2 flex h-9 w-14 shrink-0 items-center justify-center rounded-lg bg-accent text-footnote font-bold text-white">
                   {(qi + 1) * 100}
                 </span>
+                <ImageField
+                  compact
+                  image={q.image}
+                  query={q.answer || q.question}
+                  onChange={(image) => setCategory({ questions: replaceAt(category.questions, qi, { ...q, image }) })}
+                />
                 <div className="grid flex-1 gap-2 sm:grid-cols-[2fr_1fr]">
                   <input
                     className={fieldClass}

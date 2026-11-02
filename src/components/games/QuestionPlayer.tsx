@@ -5,6 +5,7 @@ import type { QuizQuestion } from "@/types/topic-package";
 import { schoolGrade } from "@/lib/labels";
 import { Button } from "@/components/ui/Button";
 import { CheckIcon, XIcon } from "@/components/ui/Icons";
+import { RemoteImage } from "@/components/ui/RemoteImage";
 import { EmptyGame } from "./GameStage";
 
 // Один плеер на два шаблона:
@@ -105,6 +106,7 @@ export function QuestionPlayer({ questions, variant }: { questions: QuizQuestion
       </div>
 
       <h3 className={`font-bold ${timed ? "py-4 text-center text-large" : "text-title2"}`}>{q.question}</h3>
+      {q.image && <RemoteImage image={q.image} className={timed ? "max-h-[38vh]" : "max-h-72"} />}
 
       <div className={`grid gap-3 ${timed ? "sm:grid-cols-2" : ""}`}>
         {q.options.map((option, i) => {

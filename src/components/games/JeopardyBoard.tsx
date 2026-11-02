@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Jeopardy } from "@/types/topic-package";
 import { Button } from "@/components/ui/Button";
+import { RemoteImage } from "@/components/ui/RemoteImage";
 
 // «Өз ойын»: тақта, сұрақты ашу, жауабын көрсету, екі команданың ұпайы.
 // Очки за вопрос зависят от его места в рубрике: 1-й — 100, 5-й — 500.
@@ -33,23 +34,24 @@ export function JeopardyBoard({ jeopardy }: { jeopardy: Jeopardy }) {
         <p className="text-subhead font-semibold uppercase tracking-widest opacity-80">
           {category.title} · {pointsOf(open.q)}
         </p>
+        {question.image && <RemoteImage image={question.image} className="max-h-[40vh] bg-white/10" />}
         <h3 className="max-w-2xl text-title1 font-bold">{question.question}</h3>
         {showAnswer ? (
           <>
             <p className="rounded-2xl bg-white/15 px-6 py-3 text-title2 font-bold">{question.answer}</p>
             <div className="flex flex-wrap justify-center gap-2">
               {teams.map((_, i) => (
-                <Button key={i} onClick={() => close(i)} className="bg-white text-indigo hover:bg-white/90">
+                <Button key={i} variant="light" onClick={() => close(i)}>
                   +{pointsOf(open.q)} — {i + 1}-команда
                 </Button>
               ))}
-              <Button variant="plain" onClick={() => close()} className="text-white">
+              <Button variant="light" onClick={() => close()}>
                 Ешкім
               </Button>
             </div>
           </>
         ) : (
-          <Button size="lg" onClick={() => setShowAnswer(true)} className="bg-white text-indigo hover:bg-white/90">
+          <Button size="lg" variant="light" onClick={() => setShowAnswer(true)}>
             Жауабын көрсету
           </Button>
         )}
