@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
-import { CheckIcon, GridIcon, ListCheckIcon, TimerIcon } from "@/components/ui/Icons";
+import { BoltIcon, CheckIcon, GridIcon, ListCheckIcon, TimerIcon } from "@/components/ui/Icons";
 
 // Шаблоны игр. Шаблон = способ показать данные пакета темы, а не новые данные.
 // Тест и викторина берут одни и те же вопросы (quiz), поэтому правка вопроса
 // видна в обеих играх. Новая игра — это новая запись здесь + её компонент
 // + название и описание в словарях src/i18n (games).
 
-export type GameId = "test" | "quiz" | "jeopardy" | "true-false";
+export type GameId = "test" | "quiz" | "jeopardy" | "true-false" | "race";
 
 export interface GameTemplate {
   id: GameId;
@@ -16,6 +16,8 @@ export interface GameTemplate {
   data: "quiz" | "trueFalse" | "jeopardy";
   /** Можно ли играть через QR, каждый со своего телефона (см. RoomHost) */
   qr: boolean;
+  /** Только вместе через QR, без режима «на экране» (см. RaceHost) */
+  live?: boolean;
 }
 
 export const games: GameTemplate[] = [
@@ -47,5 +49,15 @@ export const games: GameTemplate[] = [
     tint: "bg-teal",
     data: "trueFalse",
     qr: true,
+  },
+  {
+    // Как Kahoot: вопрос на проекторе, все отвечают с телефонов одновременно.
+    // Вопросы — те же, что у Теста и Викторины.
+    id: "race",
+    icon: <BoltIcon />,
+    tint: "bg-red",
+    data: "quiz",
+    qr: true,
+    live: true,
   },
 ];

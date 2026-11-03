@@ -5,7 +5,7 @@ import type { Language, Subject } from "./topic-package";
 // Уроки и QR-игры уже хранятся сами по себе, а для того, что больше
 // нигде не остаётся (скачанный PPTX, игра на экране), ведём журнал событий.
 
-export const gameIdSchema = z.enum(["test", "quiz", "jeopardy", "true-false"]);
+export const gameIdSchema = z.enum(["test", "quiz", "jeopardy", "true-false", "race"]);
 
 export const activitySchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("pptx"), at: z.string(), lessonId: z.string(), templateId: z.string() }),

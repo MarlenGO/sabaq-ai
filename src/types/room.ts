@@ -5,8 +5,10 @@ import { imageSchema, languageSchema } from "./topic-package";
 // создаётся комната с кодом из 6 цифр и копией вопросов (чтобы правки
 // в конструкторе не ломали идущую игру). Ученики заходят по коду
 // и отвечают каждый в своём темпе, а учитель видит таблицу результатов.
+// «Жарыс» (race) — как Kahoot: все отвечают на один вопрос одновременно,
+// темп задаёт учитель (см. live).
 
-export const roomGameSchema = z.enum(["test", "quiz", "true-false"]);
+export const roomGameSchema = z.enum(["test", "quiz", "true-false", "race"]);
 export type RoomGame = z.infer<typeof roomGameSchema>;
 
 export const roomQuestionSchema = z.object({
@@ -15,6 +17,14 @@ export const roomQuestionSchema = z.object({
   correctIndex: z.number().int(),
   explanation: z.string().optional(),
   image: imageSchema.optional(),
+});
+
+/** Ход «Жарыса»: какой вопрос на экране и что сейчас происходит */
+export const liveSchema = z.object({
+  phase: z.enum(["lobby", "question", "reveal", "finished"]),
+  index: z.number().int().min(0),
+  /** Когда показан текущий вопрос — от этого считаются время и очки */
+  startedAt: z.string().optional(),
 });
 
 export const roomSchema = z.object({
@@ -26,6 +36,9 @@ export const roomSchema = z.object({
   questions: z.array(roomQuestionSchema).min(1),
   status: z.enum(["open", "finished"]),
   createdAt: z.string(),
+  /** Каждому ученику свой порядок вопросов и вариантов, чтобы не списывали */
+  shuffle: z.boolean().optional(),
+  live: liveSchema.optional(),
 });
 
 export const answerSchema = z.object({
@@ -40,11 +53,16 @@ export const playerSchema = z.object({
   name: z.string(),
   joinedAt: z.string(),
   answers: z.array(answerSchema),
+  /** При перемешивании: на k-м месте у ученика вопрос order[k] */
+  order: z.array(z.number().int()).optional(),
+  /** optionOrders[вопрос][j] — какой исходный вариант ученик видит j-м */
+  optionOrders: z.array(z.array(z.number().int())).optional(),
 });
 
 export type RoomQuestion = z.infer<typeof roomQuestionSchema>;
 export type Room = z.infer<typeof roomSchema>;
 export type Player = z.infer<typeof playerSchema>;
+export type Live = z.infer<typeof liveSchema>;
 
 /** Что видит ученик: вопросы без правильных ответов */
 export type PublicQuestion = Omit<RoomQuestion, "correctIndex" | "explanation">;
@@ -67,6 +85,49 @@ export interface PlayerResult {
 }
 
 export const QUIZ_SECONDS = 20;
+/** Время на вопрос в «Жарысе» */
+export const RACE_SECONDS = 20;
+
+export interface RaceTeacherView {
+  phase: Live["phase"];
+  index: number;
+  total: number;
+  /** Сколько осталось времени на вопрос (считает сервер, чтобы часы у всех совпадали) */
+  remainingMs: number;
+  /** Имена вошедших — для экрана ожидания */
+  players: string[];
+  question?: PublicQuestion;
+  answered: number;
+  correctIndex?: number;
+  /** Сколько учеников выбрали каждый вариант (после показа ответа) */
+  counts?: number[];
+}
+
+export interface RaceStudentView {
+  phase: Live["phase"];
+  index: number;
+  total: number;
+  remainingMs: number;
+  question?: PublicQuestion;
+  /** Ответил ли ученик на текущий вопрос */
+  answered: boolean;
+  correctIndex?: number;
+  lastPoints?: number;
+  lastCorrect?: boolean;
+  points: number;
+  rank?: number;
+  players?: number;
+}
+
+/** Статистика по одному вопросу: сколько ответили и что выбирали */
+export interface QuestionStat {
+  index: number;
+  prompt: string;
+  answered: number;
+  correct: number;
+  /** Самый частый неверный вариант (текст) — подсказка учителю, в чём путаница */
+  commonWrong?: string;
+}
 
 export const joinSchema = z.object({ name: z.string().trim().min(1).max(30) });
 export const answerRequestSchema = z.object({

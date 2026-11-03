@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { sortResults, toResult } from "@/lib/rooms";
+import { questionStats, sortResults, toResult } from "@/lib/rooms";
 import { getRoom, listPlayers } from "@/lib/storage/rooms";
 import { Card } from "@/components/ui/Card";
 import { ArrowLeftIcon } from "@/components/ui/Icons";
-import { CsvButton, ResultsTable } from "@/components/games/ResultsTable";
+import { CsvButton, QuestionStats, ResultsTable } from "@/components/games/ResultsTable";
 import { dateTimeOf } from "@/lib/dates";
 import { getT } from "@/i18n/server";
 
@@ -15,7 +15,8 @@ export default async function PastGamePage({ params }: PageProps<"/history/game/
   if (!room) notFound();
   const t = await getT();
 
-  const results = sortResults((await listPlayers(code)).map(toResult));
+  const players = await listPlayers(code);
+  const results = sortResults(players.map(toResult));
   const total = room.questions.length;
   const when = dateTimeOf(room.createdAt);
 
@@ -54,6 +55,11 @@ export default async function PastGamePage({ params }: PageProps<"/history/game/
           </div>
         )}
       </Card>
+      {results.length > 0 && (
+        <div className="mt-6">
+          <QuestionStats stats={questionStats(room, players)} />
+        </div>
+      )}
     </main>
   );
 }

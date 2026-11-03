@@ -1,53 +1,61 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { limits, type Deck, type TopicPackage } from "@/types/topic-package";
+import { limits, type LayoutData, type TopicPackage } from "@/types/topic-package";
 import type { SlideKind } from "@/slides/layout";
-import { resolveDeck } from "@/slides/deck";
+import { findSlide, isDataSlide, slideData, type ContentKind, type DataSlide } from "@/slides/structures";
 import { Button } from "@/components/ui/Button";
 import { PlusIcon } from "@/components/ui/Icons";
 import { DeleteButton, MoveButtons } from "@/components/ui/ItemButtons";
 import { confirmDelete, fieldClass, moveItem, replaceAt } from "@/components/ui/field";
 import { useT } from "@/i18n/client";
 
-// Поля одного слайда в конструкторе. Слайды с содержанием темы (титул,
-// определение, факты, примеры, термины) правят сам пакет темы, а заготовки —
-// свой раздел в pkg.deck. Раскладка слайда при этом не меняется: только текст.
+// Поля одного слайда в конструкторе. Слайды с содержанием темы (определение,
+// факты, примеры, термины) правят сам пакет темы, а заготовки — свои данные
+// в pkg.deck[id слайда]. Раскладка слайда при этом не меняется: только текст.
 
-type Props = { kind: SlideKind; pkg: TopicPackage; onChange: (pkg: TopicPackage) => void };
+type Props = { slideId: string; kind: SlideKind; pkg: TopicPackage; onChange: (pkg: TopicPackage) => void };
 
-/** Какой раздел pkg.deck правит слайд-заготовка */
-const deckKey: Partial<Record<SlideKind, keyof Deck>> = {
-  goals: "goals",
-  plan: "plan",
-  "text-image": "textImage",
-  "big-image": "bigImage",
-  compare: "compare",
-  numbers: "numbers",
-  table: "table",
-  chart: "chart",
-  think: "think",
-  task: "task",
-  reflection: "reflection",
-  homework: "homework",
-};
+type Content = Pick<TopicPackage, "definition" | "formula" | "keyFacts" | "examples" | "terms">;
 
-export function SlideFields({ kind, pkg, onChange }: Props) {
+/**
+ * Что пишет кнопка «AI» на этом слайде: как достать текущие тексты (для «Болдырмау»)
+ * и как вставить новые. У титула кнопки нет — там тема и подписи.
+ */
+export function slideAiPart(pkg: TopicPackage, slideId: string, kind: SlideKind) {
+  const pick = <K extends keyof Content>(...keys: K[]) => ({
+    get: (p: TopicPackage) => Object.fromEntries(keys.map((k) => [k, p[k]])) as Pick<Content, K>,
+    set: (p: TopicPackage, value: Pick<Content, K>): TopicPackage => ({ ...p, ...value }),
+  });
+  if (kind === "title") return null;
+  if (kind === "definition") return pick("definition", "formula");
+  if (kind === "facts") return pick("keyFacts");
+  if (kind === "examples") return pick("examples");
+  if (kind === "terms") return pick("terms");
+  const spec = findSlide(pkg, slideId);
+  if (!spec || !isDataSlide(spec)) return null;
+  return {
+    get: (p: TopicPackage) => slideData(p, spec) as unknown,
+    set: (p: TopicPackage, value: unknown): TopicPackage => ({ ...p, deck: { ...p.deck, [slideId]: value as Record<string, unknown> } }),
+  };
+}
+
+export function SlideFields({ slideId, kind, pkg, onChange }: Props) {
   const t = useT();
-  const key = deckKey[kind];
-  if (!key) return <ContentFields kind={kind} pkg={pkg} onChange={onChange} />;
+  const spec = findSlide(pkg, slideId);
+  if (!spec || !isDataSlide(spec)) return <ContentFields kind={kind as ContentKind} pkg={pkg} onChange={onChange} />;
 
-  const changed = Boolean(pkg.deck?.[key]);
+  const changed = Boolean(pkg.deck?.[slideId]);
   const reset = () => {
     if (!window.confirm(t.deck.resetConfirm)) return;
     const deck = { ...pkg.deck };
-    delete deck[key];
+    delete deck[slideId];
     onChange({ ...pkg, deck });
   };
 
   return (
     <div className="flex flex-col gap-5">
-      <DeckFields kind={kind} pkg={pkg} onChange={onChange} />
+      <DeckFields spec={spec} pkg={pkg} onChange={onChange} />
       {changed && (
         <Button variant="plain" className="self-start" onClick={reset}>
           {t.deck.reset}
@@ -57,13 +65,9 @@ export function SlideFields({ kind, pkg, onChange }: Props) {
   );
 }
 
-function ContentFields({ kind, pkg, onChange }: Props) {
+function ContentFields({ kind, pkg, onChange }: { kind: ContentKind; pkg: TopicPackage; onChange: (pkg: TopicPackage) => void }) {
   const t = useT();
   const set = (patch: Partial<TopicPackage>) => onChange({ ...pkg, ...patch });
-
-  if (kind === "title") {
-    return <TextField label={t.editor.topic} value={pkg.topic} onChange={(topic) => set({ topic })} />;
-  }
 
   if (kind === "definition") {
     const formula = pkg.formula;
@@ -159,10 +163,9 @@ function ContentFields({ kind, pkg, onChange }: Props) {
   );
 }
 
-function DeckFields({ kind, pkg, onChange }: Props) {
+function DeckFields({ spec, pkg, onChange }: { spec: DataSlide; pkg: TopicPackage; onChange: (pkg: TopicPackage) => void }) {
   const t = useT();
-  const d = resolveDeck(pkg);
-  const set = <K extends keyof Deck>(key: K, value: Deck[K]) => onChange({ ...pkg, deck: { ...pkg.deck, [key]: value } });
+  const save = (value: object) => onChange({ ...pkg, deck: { ...pkg.deck, [spec.id]: value as Record<string, unknown> } });
   const heading = (value: string, save: (title: string) => void) => (
     <TextField label={t.deck.heading} value={value} onChange={save} />
   );
@@ -171,47 +174,66 @@ function DeckFields({ kind, pkg, onChange }: Props) {
   );
   const imageNote = <p className="rounded-xl bg-fill px-4 py-3 text-subhead text-label-2">{t.deck.imageNote}</p>;
 
-  switch (kind) {
-    case "goals": {
-      const g = d.goals;
+  switch (spec.kind) {
+    case "title": {
+      const ti = slideData(pkg, spec);
       return (
         <div className="flex flex-col gap-5">
-          {heading(g.title, (title) => set("goals", { ...g, title }))}
+          <TextField label={t.editor.topic} value={pkg.topic} onChange={(topic) => onChange({ ...pkg, topic })} />
+          <TextField label={t.deck.kicker} value={ti.kicker} onChange={(kicker) => save({ ...ti, kicker })} />
+          <TextField label={t.deck.author} value={ti.author} onChange={(author) => save({ ...ti, author })} />
+        </div>
+      );
+    }
+    case "bullets": {
+      const b = slideData(pkg, spec);
+      return (
+        <div className="flex flex-col gap-5">
+          {heading(b.title, (title) => save({ ...b, title }))}
+          {lines(t.deck.points, b.lines, (items) => save({ ...b, lines: items }))}
+        </div>
+      );
+    }
+    case "goals": {
+      const g = slideData(pkg, spec);
+      return (
+        <div className="flex flex-col gap-5">
+          {heading(g.title, (title) => save({ ...g, title }))}
           {g.items.map((item, i) => (
             <Pair
               key={i}
               label={t.deck.goalN(i + 1)}
               first={{ label: t.deck.goalTitle, value: item.title }}
               second={{ label: t.deck.goalBody, value: item.body }}
-              onChange={(title, body) => set("goals", { ...g, items: replaceAt(g.items, i, { title, body }) })}
+              onChange={(title, body) => save({ ...g, items: replaceAt(g.items, i, { title, body }) })}
             />
           ))}
         </div>
       );
     }
     case "plan": {
-      const p = d.plan;
+      const p = slideData(pkg, spec);
       return (
         <div className="flex flex-col gap-5">
-          {heading(p.title, (title) => set("plan", { ...p, title }))}
+          {heading(p.title, (title) => save({ ...p, title }))}
           {p.steps.map((step, i) => (
             <Pair
               key={i}
               label={t.deck.stepN(i + 1)}
               first={{ label: t.deck.stepName, value: step.name }}
               second={{ label: t.deck.stepTime, value: step.time }}
-              onChange={(name, time) => set("plan", { ...p, steps: replaceAt(p.steps, i, { name, time }) })}
+              onChange={(name, time) => save({ ...p, steps: replaceAt(p.steps, i, { name, time }) })}
             />
           ))}
         </div>
       );
     }
     case "text-image": {
-      const ti = d.textImage;
+      const ti = slideData(pkg, spec);
       return (
         <div className="flex flex-col gap-5">
-          {heading(ti.title, (title) => set("textImage", { ...ti, title }))}
-          {lines(t.deck.points, ti.bullets, (bullets) => set("textImage", { ...ti, bullets }))}
+          {heading(ti.title, (title) => save({ ...ti, title }))}
+          {lines(t.deck.points, ti.bullets, (bullets) => save({ ...ti, bullets }))}
           {imageNote}
         </div>
       );
@@ -219,22 +241,22 @@ function DeckFields({ kind, pkg, onChange }: Props) {
     case "big-image":
       return (
         <div className="flex flex-col gap-5">
-          <TextField label={t.deck.caption} value={d.bigImage.caption} onChange={(caption) => set("bigImage", { caption })} />
+          <TextField label={t.deck.caption} value={slideData(pkg, spec).caption} onChange={(caption) => save({ caption })} />
           {imageNote}
         </div>
       );
     case "compare": {
-      const c = d.compare;
+      const c = slideData(pkg, spec);
       return (
         <div className="flex flex-col gap-5">
-          {heading(c.title, (title) => set("compare", { ...c, title }))}
+          {heading(c.title, (title) => save({ ...c, title }))}
           <div className="grid gap-5 md:grid-cols-2">
             {(["left", "right"] as const).map((side) => {
               const linesKey = side === "left" ? "leftLines" : "rightLines";
               return (
                 <div key={side} className="flex flex-col gap-3 rounded-2xl bg-fill/60 p-3">
-                  <TextField label={t.deck[side]} value={c[side]} onChange={(value) => set("compare", { ...c, [side]: value })} />
-                  {lines(t.deck.points, c[linesKey], (items) => set("compare", { ...c, [linesKey]: items }))}
+                  <TextField label={t.deck[side]} value={c[side]} onChange={(value) => save({ ...c, [side]: value })} />
+                  {lines(t.deck.points, c[linesKey], (items) => save({ ...c, [linesKey]: items }))}
                 </div>
               );
             })}
@@ -243,47 +265,47 @@ function DeckFields({ kind, pkg, onChange }: Props) {
       );
     }
     case "numbers": {
-      const n = d.numbers;
+      const n = slideData(pkg, spec);
       return (
         <div className="flex flex-col gap-5">
-          {heading(n.title, (title) => set("numbers", { ...n, title }))}
+          {heading(n.title, (title) => save({ ...n, title }))}
           {n.items.map((item, i) => (
             <Pair
               key={i}
               label={t.deck.numberN(i + 1)}
               first={{ label: t.deck.number, value: item.value }}
               second={{ label: t.deck.numberCaption, value: item.caption }}
-              onChange={(value, caption) => set("numbers", { ...n, items: replaceAt(n.items, i, { value, caption }) })}
+              onChange={(value, caption) => save({ ...n, items: replaceAt(n.items, i, { value, caption }) })}
             />
           ))}
         </div>
       );
     }
     case "table":
-      return <TableFields table={d.table} onChange={(table) => set("table", table)} />;
+      return <TableFields table={slideData(pkg, spec)} onChange={save} />;
     case "chart":
-      return <ChartFields chart={d.chart} onChange={(chart) => set("chart", chart)} />;
+      return <ChartFields chart={slideData(pkg, spec)} onChange={save} />;
     case "think": {
-      const th = d.think;
+      const th = slideData(pkg, spec);
       return (
         <div className="flex flex-col gap-5">
-          {heading(th.title, (title) => set("think", { ...th, title }))}
-          <TextField label={t.deck.question} multiline value={th.question} onChange={(question) => set("think", { ...th, question })} />
-          <TextField label={t.deck.hintLine} value={th.hint} onChange={(hint) => set("think", { ...th, hint })} />
+          {heading(th.title, (title) => save({ ...th, title }))}
+          <TextField label={t.deck.question} multiline value={th.question} onChange={(question) => save({ ...th, question })} />
+          <TextField label={t.deck.hintLine} value={th.hint} onChange={(hint) => save({ ...th, hint })} />
         </div>
       );
     }
     case "task": {
-      const tk = d.task;
+      const tk = slideData(pkg, spec);
       return (
         <div className="flex flex-col gap-5">
-          {heading(tk.title, (title) => set("task", { ...tk, title }))}
-          <TextField label={t.deck.taskName} value={tk.name} onChange={(name) => set("task", { ...tk, name })} />
-          {lines(t.deck.taskLines, tk.lines, (items) => set("task", { ...tk, lines: items }))}
+          {heading(tk.title, (title) => save({ ...tk, title }))}
+          <TextField label={t.deck.taskName} value={tk.name} onChange={(name) => save({ ...tk, name })} />
+          {lines(t.deck.taskLines, tk.lines, (items) => save({ ...tk, lines: items }))}
           <TextField
             label={t.deck.criteriaTitle}
             value={tk.criteriaTitle}
-            onChange={(criteriaTitle) => set("task", { ...tk, criteriaTitle })}
+            onChange={(criteriaTitle) => save({ ...tk, criteriaTitle })}
           />
           <Group label={t.deck.criteria}>
             {tk.criteria.map((item, i) => (
@@ -292,7 +314,7 @@ function DeckFields({ kind, pkg, onChange }: Props) {
                 className={fieldClass}
                 value={item}
                 aria-label={t.deck.pointN(i + 1)}
-                onChange={(e) => set("task", { ...tk, criteria: replaceAt(tk.criteria, i, e.target.value) })}
+                onChange={(e) => save({ ...tk, criteria: replaceAt(tk.criteria, i, e.target.value) })}
               />
             ))}
           </Group>
@@ -300,38 +322,36 @@ function DeckFields({ kind, pkg, onChange }: Props) {
       );
     }
     case "reflection": {
-      const r = d.reflection;
+      const r = slideData(pkg, spec);
       return (
         <div className="flex flex-col gap-5">
-          {heading(r.title, (title) => set("reflection", { ...r, title }))}
+          {heading(r.title, (title) => save({ ...r, title }))}
           {r.items.map((item, i) => (
             <TextField
               key={i}
               label={t.deck.phraseN(i + 1)}
               value={item}
-              onChange={(value) => set("reflection", { ...r, items: replaceAt(r.items, i, value) })}
+              onChange={(value) => save({ ...r, items: replaceAt(r.items, i, value) })}
             />
           ))}
         </div>
       );
     }
     case "homework": {
-      const h = d.homework;
+      const h = slideData(pkg, spec);
       return (
         <div className="flex flex-col gap-5">
-          {heading(h.title, (title) => set("homework", { ...h, title }))}
-          {lines(t.deck.homework, h.lines, (items) => set("homework", { ...h, lines: items }))}
-          <TextField label={t.deck.thanks} value={h.thanks} onChange={(thanks) => set("homework", { ...h, thanks })} />
+          {heading(h.title, (title) => save({ ...h, title }))}
+          {lines(t.deck.homework, h.lines, (items) => save({ ...h, lines: items }))}
+          <TextField label={t.deck.thanks} value={h.thanks} onChange={(thanks) => save({ ...h, thanks })} />
         </div>
       );
     }
-    default:
-      return null;
   }
 }
 
 // Таблица: строка заголовков и строки значений; столбцы и строки можно добавлять
-function TableFields({ table, onChange }: { table: Deck["table"]; onChange: (table: Deck["table"]) => void }) {
+function TableFields({ table, onChange }: { table: LayoutData<"table">; onChange: (table: LayoutData<"table">) => void }) {
   const t = useT();
   const { columns, rows } = table;
   const setCell = (r: number, c: number, value: string) =>
@@ -417,7 +437,7 @@ function TableFields({ table, onChange }: { table: Deck["table"]; onChange: (tab
 }
 
 // Диаграмма: подпись и число для каждого столбика
-function ChartFields({ chart, onChange }: { chart: Deck["chart"]; onChange: (chart: Deck["chart"]) => void }) {
+function ChartFields({ chart, onChange }: { chart: LayoutData<"chart">; onChange: (chart: LayoutData<"chart">) => void }) {
   const t = useT();
   const { items } = chart;
   return (

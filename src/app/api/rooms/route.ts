@@ -5,7 +5,7 @@ import { roomQuestions } from "@/lib/rooms";
 import { getLesson } from "@/lib/storage/lessons";
 import { createRoom } from "@/lib/storage/rooms";
 
-const createSchema = z.object({ lessonId: z.string(), game: roomGameSchema });
+const createSchema = z.object({ lessonId: z.string(), game: roomGameSchema, shuffle: z.boolean().default(false) });
 
 // POST /api/rooms — учитель запускает игру через QR
 export async function POST(request: Request) {
@@ -24,6 +24,9 @@ export async function POST(request: Request) {
     title: lesson.topic,
     language: lesson.language,
     questions,
+    // В «Жарысе» все видят один вопрос на экране — перемешивать нечего
+    shuffle: parsed.data.game !== "race" && parsed.data.shuffle,
+    live: parsed.data.game === "race" ? { phase: "lobby", index: 0 } : undefined,
   });
   return Response.json({ code: room.code });
 }

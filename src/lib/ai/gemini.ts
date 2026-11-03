@@ -21,11 +21,24 @@ export function hasAiKey() {
   return Boolean(process.env.GEMINI_API_KEY);
 }
 
+// Gemini отклоняет «тяжёлые» схемы с ошибкой 400 INVALID_ARGUMENT: у нас это
+// maxItems во вложенных списках (до 30 вопросов × 4 варианта). Убираем его —
+// сколько элементов нужно, сказано в промпте, а ответ всё равно проверяет zod.
+function withoutMaxItems(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(withoutMaxItems);
+  if (!node || typeof node !== "object") return node;
+  return Object.fromEntries(
+    Object.entries(node)
+      .filter(([key]) => key !== "maxItems")
+      .map(([key, value]) => [key, withoutMaxItems(value)]),
+  );
+}
+
 // JSON Schema для Gemini строим из той же схемы zod, которой потом проверяем ответ
 function toGeminiSchema(schema: z.ZodType) {
   const jsonSchema: Record<string, unknown> = z.toJSONSchema(schema, { io: "input" });
   delete jsonSchema.$schema;
-  return jsonSchema;
+  return withoutMaxItems(jsonSchema);
 }
 
 interface GenerateContentResponse {

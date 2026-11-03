@@ -9,12 +9,15 @@ import { confirmDelete, fieldClass, moveItem, replaceAt } from "@/components/ui/
 import { DeleteButton, MoveButtons } from "@/components/ui/ItemButtons";
 import { ImageField } from "./ImageField";
 import { useT } from "@/i18n/client";
+import { AiButton } from "@/components/lesson/AiButton";
 
 // Конструкторы игр. Каждый правит свою часть пакета темы:
 // QuizEditor — вопросы для «Теста» и «Викторины», TrueFalseEditor — утверждения,
 // JeopardyEditor — тақта «Өз ойын».
 
 const letters = ["A", "B", "C", "D"];
+
+type JeopardyQuestion = Jeopardy["categories"][number]["questions"][number];
 
 // Вариант ответа меняется местами с соседним; отметка «дұрыс» переезжает вместе с ним
 function moveOption(q: QuizQuestion, from: number, to: number): Partial<QuizQuestion> {
@@ -38,7 +41,14 @@ export function QuizEditor({ questions, onChange }: { questions: QuizQuestion[];
           <Card key={qi} className="flex flex-col gap-3 p-4">
             <div className="flex items-center justify-between gap-2">
               <span className="text-subhead font-semibold">{t.editor.questionN(qi + 1)}</span>
-              <div className="flex items-center">
+              <div className="flex flex-wrap items-center justify-end">
+                <AiButton
+                  request={{ part: "quiz", avoid: questions.filter((_, i) => i !== qi).map((x) => x.question) }}
+                  current={q}
+                  // Новый вопрос — без старой картинки: она была к прежнему вопросу
+                  apply={(value: QuizQuestion) => onChange(replaceAt(questions, qi, value))}
+                  hint={t.ai.questionHint}
+                />
                 <MoveButtons
                   index={qi}
                   count={questions.length}
@@ -144,6 +154,12 @@ export function TrueFalseEditor({
             <div className="flex items-center justify-between gap-3">
               <span className="text-subhead font-semibold">{t.editor.statementN(i + 1)}</span>
               <div className="flex flex-wrap items-center justify-end gap-2">
+                <AiButton
+                  request={{ part: "trueFalse", avoid: items.filter((_, j) => j !== i).map((x) => x.statement) }}
+                  current={item}
+                  apply={(value: TrueFalseStatement) => onChange(replaceAt(items, i, value))}
+                  hint={t.ai.statementHint}
+                />
                 <MoveButtons
                   index={i}
                   count={items.length}
@@ -269,6 +285,19 @@ export function JeopardyEditor({ jeopardy, onChange }: { jeopardy: Jeopardy; onC
                     }
                   />
                 </div>
+                <AiButton
+                  request={{
+                    part: "jeopardy",
+                    category: category.title,
+                    points: (qi + 1) * 100,
+                    avoid: category.questions.filter((_, j) => j !== qi).map((x) => x.question),
+                  }}
+                  current={q}
+                  apply={(value: JeopardyQuestion) =>
+                    setCategory({ questions: replaceAt(category.questions, qi, value) })
+                  }
+                  hint={t.ai.jeopardyHint}
+                />
               </div>
             ))}
           </Card>

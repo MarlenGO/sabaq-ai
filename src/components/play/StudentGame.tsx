@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { QUIZ_SECONDS, type PublicQuestion, type PublicRoom, type RoomGame } from "@/types/room";
+import { QUIZ_SECONDS, type PublicQuestion, type PublicRoom, type RaceStudentView, type RoomGame } from "@/types/room";
 import { schoolGrade } from "@/lib/labels";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -10,10 +10,13 @@ import { CheckIcon, XIcon } from "@/components/ui/Icons";
 import { RemoteImage } from "@/components/ui/RemoteImage";
 import { fieldClass } from "@/components/ui/field";
 import { useT } from "@/i18n/client";
+import { raceTiles, RACE_POLL_MS } from "@/components/games/race";
 
 // Игра на телефоне ученика: ввести имя и ответить на вопросы в своём темпе.
 // id ученика хранится в браузере, поэтому после обновления страницы
-// игра продолжается с того же вопроса.
+// игра продолжается с того же вопроса. Если учитель включил перемешивание,
+// сервер отдаёт вопросы в порядке именно этого ученика.
+// В «Жарысе» темп задаёт учитель: телефон только показывает кнопки ответов.
 
 interface Answer {
   index: number;
@@ -104,6 +107,9 @@ export function StudentGame({ code }: { code: string }) {
       localStorage.setItem(playerKey(code), data.playerId);
     } catch {}
     setPlayerId(data.playerId);
+    // Вопросы заново: после входа сервер отдаёт их в порядке этого ученика
+    const fresh = await loadRoom(code);
+    if (fresh?.room) setRoom(fresh.room);
   };
 
   if (!playerId) {
@@ -139,6 +145,8 @@ export function StudentGame({ code }: { code: string }) {
       </Card>
     );
   }
+
+  if (room.game === "race") return <RaceStudent code={code} playerId={playerId} name={name} />;
 
   const total = room.questions.length;
   const next = answers.length;
@@ -293,6 +301,151 @@ function QuestionCard(props: {
             {index + 1 >= total ? t.play.seeMyResult : t.common.nextQuestion}
           </Button>
         </Card>
+      )}
+    </div>
+  );
+}
+
+// ——— «Жарыс» на телефоне ———
+
+function RaceStudent({ code, playerId, name }: { code: string; playerId: string; name: string }) {
+  const [view, setView] = useState<(RaceStudentView & { receivedAt: number }) | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [sentIndex, setSentIndex] = useState(-1);
+  const [sending, setSending] = useState(false);
+  const t = useT();
+
+  useEffect(() => {
+    let active = true;
+    const load = () =>
+      fetch(`/api/rooms/${code}/play?player=${playerId}`)
+        .then((r) => r.json())
+        .then((data) => active && data.race && setView({ ...data.race, receivedAt: Date.now() }))
+        .catch(() => {});
+    load();
+    const poll = setInterval(load, RACE_POLL_MS);
+    const clock = setInterval(() => setNow(Date.now()), 250);
+    return () => {
+      active = false;
+      clearInterval(poll);
+      clearInterval(clock);
+    };
+  }, [code, playerId]);
+
+  if (!view) return <Card className="h-64 animate-pulse" />;
+
+  const submit = async (choice: number) => {
+    setSending(true);
+    await fetch(`/api/rooms/${code}/answers`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerId, index: view.index, choice, ms: 0 }),
+    }).catch(() => null);
+    setSending(false);
+    // Даже если опоздал — кнопки больше не нужны, ждём показа ответа
+    setSentIndex(view.index);
+  };
+
+  const remaining = Math.max(0, view.remainingMs - (now - view.receivedAt));
+  const place = view.rank && view.players ? t.race.place(view.rank, view.players) : null;
+
+  if (view.phase === "lobby") {
+    return (
+      <Card className="flex flex-col items-center gap-3 p-8 text-center">
+        <p className="text-title2 font-bold">{t.race.youAreIn(name)}</p>
+        <p className="animate-pulse text-body text-label-2">{t.race.waitStart}</p>
+      </Card>
+    );
+  }
+
+  if (view.phase === "finished") {
+    return (
+      <Card className="flex flex-col items-center gap-2 p-8 text-center">
+        <p className="text-title3 text-label-2">{t.race.finished}</p>
+        <p className="text-display font-bold text-accent">{t.common.points(view.points)}</p>
+        {place && <p className="text-title3 font-semibold">{place}</p>}
+        <p className="mt-3 text-subhead text-label-2">{t.play.onTeacherScreen}</p>
+      </Card>
+    );
+  }
+
+  const question = view.question;
+  const answered = view.answered || sentIndex === view.index;
+
+  if (view.phase === "reveal") {
+    const correct = view.correctIndex;
+    return (
+      <div className="flex flex-col gap-4">
+        {/* Не Card: у карточки свой фон, а здесь цвет — это и есть ответ */}
+        <div
+          className={`flex flex-col items-center gap-2 rounded-2xl p-8 text-center text-white ${
+            view.lastCorrect ? "bg-green" : view.lastCorrect === false ? "bg-red" : "bg-label-2"
+          }`}
+        >
+          <p className="text-title1 font-bold">
+            {view.lastCorrect ? t.common.correct : view.lastCorrect === false ? t.common.wrong : t.race.noAnswer}
+          </p>
+          {view.lastCorrect && <p className="text-title2 font-bold">+{view.lastPoints}</p>}
+        </div>
+        {question && correct !== undefined && (
+          <div className={`flex min-h-16 items-center gap-3 rounded-2xl px-4 py-3 text-body font-semibold text-white ${raceTiles[correct].color}`}>
+            <span className="text-title2" aria-hidden="true">
+              {raceTiles[correct].shape}
+            </span>
+            <span className="flex-1">{question.options[correct]}</span>
+            <CheckIcon />
+          </div>
+        )}
+        <Card className="flex flex-col items-center gap-1 p-5 text-center">
+          <p className="text-title2 font-bold tabular-nums">{t.common.points(view.points)}</p>
+          {place && <p className="text-body text-label-2">{place}</p>}
+          <p className="mt-2 text-subhead text-label-2">{t.race.waitNext}</p>
+        </Card>
+      </div>
+    );
+  }
+
+  // Идёт вопрос
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <span className="text-subhead font-semibold text-label-2">
+          {view.index + 1} / {view.total}
+        </span>
+        <span className="text-title3 font-bold tabular-nums">
+          {Math.ceil(remaining / 1000)} {t.common.seconds}
+        </span>
+      </div>
+      {answered ? (
+        <Card className="flex flex-col items-center gap-3 p-8 text-center">
+          <CheckIcon className="h-10 w-10 text-green" />
+          <p className="text-title3 font-semibold">{t.race.sent}</p>
+        </Card>
+      ) : remaining === 0 ? (
+        <Card className="p-8 text-center text-title3 font-semibold text-orange">{t.common.timeUp}</Card>
+      ) : (
+        question && (
+          <>
+            <p className="text-body font-semibold">{question.prompt}</p>
+            <p className="text-footnote text-label-2">{t.race.pick}</p>
+            <div className="grid grid-cols-2 gap-3">
+              {question.options.map((option, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  disabled={sending}
+                  onClick={() => submit(i)}
+                  className={`flex min-h-28 flex-col items-center justify-center gap-2 rounded-2xl p-3 text-center text-body font-semibold text-white transition active:scale-[0.97] ${raceTiles[i].color}`}
+                >
+                  <span className="text-large" aria-hidden="true">
+                    {raceTiles[i].shape}
+                  </span>
+                  <span>{option}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )
       )}
     </div>
   );

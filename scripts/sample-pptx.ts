@@ -1,5 +1,6 @@
 // Пробные презентации без браузера: npm run sample:pptx
-// Собирает PPTX из мокового пакета во всех шаблонах в папку data/samples/.
+// Собирает PPTX из мокового пакета во всех стилях и во всех видах презентаций
+// (урок, отчёт, доклад…) в папку data/samples/.
 // Удобно проверять, как раскладка выглядит в настоящем PowerPoint.
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -9,6 +10,7 @@ import { newtonFirstLaw7 } from "../src/data/mock-packages/newton-first-law-7";
 import { buildPptx, pptxBytes } from "../src/slides/export-pptx";
 import { ICON_PX, type Rasterize } from "../src/slides/icons";
 import { templates } from "../src/slides/templates";
+import { deckTypeOrder } from "../src/slides/structures";
 
 const outDir = path.join(process.cwd(), "data", "samples");
 
@@ -23,6 +25,12 @@ async function main() {
   for (const template of templates) {
     const file = path.join(outDir, `sample-${template.id}.pptx`);
     const pptx = await buildPptx(PptxGenJS, newtonFirstLaw7, rasterize, template);
+    await writeFile(file, await pptxBytes(pptx));
+    console.log("✓", file);
+  }
+  for (const deckType of deckTypeOrder) {
+    const file = path.join(outDir, `type-${deckType}.pptx`);
+    const pptx = await buildPptx(PptxGenJS, { ...newtonFirstLaw7, deckType }, rasterize, templates[0]);
     await writeFile(file, await pptxBytes(pptx));
     console.log("✓", file);
   }

@@ -9,7 +9,10 @@ import { Card } from "@/components/ui/Card";
 import { ArrowLeftIcon, ChevronRightIcon } from "@/components/ui/Icons";
 import { useT } from "@/i18n/client";
 import { SlideCanvas } from "./SlideCanvas";
-import { SlideFields } from "./SlideFields";
+import { SlideFields, slideAiPart } from "./SlideFields";
+import { AiButton } from "@/components/lesson/AiButton";
+import { FillDeckButton } from "./DeckTypePicker";
+import type { AiPart } from "@/types/ai";
 
 // Конструктор презентации по слайдам, как в PowerPoint: слева (на телефоне — сверху)
 // маленькие слайды, справа выбранный слайд крупно и поля именно этого слайда.
@@ -21,6 +24,7 @@ export function SlideEditor({ pkg, onChange }: { pkg: TopicPackage; onChange: (p
   // Если факты удалили и слайдов стало меньше — остаёмся на последнем
   const index = Math.min(selected, slides.length - 1);
   const slide = slides[index];
+  const aiPart = slideAiPart(pkg, slide.id, slide.kind);
   const top = useRef<HTMLDivElement>(null);
 
   const select = (i: number) => {
@@ -47,23 +51,38 @@ export function SlideEditor({ pkg, onChange }: { pkg: TopicPackage; onChange: (p
             <SlideCanvas slide={s} template={template} />
             <span className="mt-1 flex items-baseline gap-1.5 px-0.5 text-caption">
               <b className="tabular-nums">{i + 1}</b>
-              <span className="truncate text-label-2">{t.deck.kinds[s.kind]}</span>
+              <span className="truncate text-label-2">{s.title}</span>
             </span>
           </button>
         ))}
       </nav>
 
       <div ref={top} className="flex min-w-0 scroll-mt-36 flex-col gap-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <h2 className="text-title3 font-semibold">
-            {index + 1}. {t.deck.kinds[slide.kind]}
-          </h2>
-          <span className="text-footnote text-label-2">{t.deck.of(index + 1, slides.length)}</span>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <div>
+            <h2 className="text-title3 font-semibold">
+              {index + 1}. {slide.title}
+            </h2>
+            <span className="text-footnote text-label-2">{t.deck.of(index + 1, slides.length)}</span>
+          </div>
+          {aiPart && (
+            <AiButton
+              key={index}
+              wide
+              request={{ part: slide.kind as AiPart, slide: slide.id }}
+              current={aiPart.get(pkg)}
+              apply={(value) => onChange(aiPart.set(pkg, value as never))}
+              hint={t.ai.slideHint}
+            />
+          )}
         </div>
         <SlideCanvas slide={slide} template={template} />
-        <p className="text-subhead text-label-2">{t.deck.hint}</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-subhead text-label-2">{t.deck.hint}</p>
+          <FillDeckButton pkg={pkg} onChange={onChange} />
+        </div>
         <Card className="p-4 sm:p-6">
-          <SlideFields kind={slide.kind} pkg={pkg} onChange={onChange} />
+          <SlideFields slideId={slide.id} kind={slide.kind} pkg={pkg} onChange={onChange} />
         </Card>
         <div className="flex justify-between gap-2">
           <Button variant="tinted" disabled={index === 0} onClick={() => select(index - 1)}>

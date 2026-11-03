@@ -1,7 +1,6 @@
-import type { Language, TopicPackage } from "@/types/topic-package";
-import { messages } from "@/i18n/locale";
-import { resolveDeck } from "./deck";
+import type { Language, LayoutKind, TopicPackage } from "@/types/topic-package";
 import type { IconName } from "./icons";
+import { isDataSlide, slideData, structureOf, type ContentKind, type DataSlide } from "./structures";
 import type { SlideTemplate } from "./templates";
 
 // Раскладка слайдов — одна на превью и на PPTX.
@@ -11,8 +10,9 @@ import type { SlideTemplate } from "./templates";
 //   SlideCanvas.tsx — в браузере (HTML), export-pptx.ts — в файл PowerPoint.
 // Поэтому то, что учитель видит на сайте, совпадает со скачанным файлом.
 //
-// Слайды двух видов: с содержанием из пакета темы и заготовки (цели, план,
-// таблица, рефлексия…) — их тексты учитель правит в конструкторе (pkg.deck).
+// Какие слайды и в каком порядке — решает вид презентации (structures.ts):
+// слайды с содержанием темы из пакета и слайды-заготовки (цели, план, таблица…),
+// тексты которых учитель правит в конструкторе (pkg.deck). Здесь только раскладки.
 
 /** Слайд 16:9 в PowerPoint — 10 × 5,625 дюйма, то есть 720 × 405 пунктов */
 export const SLIDE_W_PT = 720;
@@ -48,34 +48,21 @@ export type SlideElement =
       valign?: "top" | "middle" | "bottom";
     });
 
-export type SlideKind =
-  | "title"
-  | "goals"
-  | "plan"
-  | "definition"
-  | "facts"
-  | "examples"
-  | "terms"
-  | "text-image"
-  | "big-image"
-  | "compare"
-  | "numbers"
-  | "table"
-  | "chart"
-  | "think"
-  | "task"
-  | "reflection"
-  | "homework";
+/** Раскладка слайда: заготовки (LayoutKind) и слайды с содержанием темы */
+export type SlideKind = LayoutKind | ContentKind;
 
 export interface Slide {
+  /** id слайда в виде презентации — по нему конструктор и AI находят его данные */
+  id: string;
   kind: SlideKind;
+  /** Заголовок — подпись в списке слайдов конструктора */
+  title: string;
   elements: SlideElement[];
 }
 
-// Заголовки слайдов с содержанием темы. Тексты заготовок — в deck.ts.
+// Заголовки слайдов с содержанием темы и подписи места под картинку
 const copy = {
   kk: {
-    grade: "сынып",
     definition: "Анықтама",
     facts: "Негізгі фактілер",
     examples: "Өмірдегі мысалдар",
@@ -83,7 +70,6 @@ const copy = {
     image: { label: "Сурет орны", prompt: "Сурет қою үшін белгішені басыңыз" },
   },
   ru: {
-    grade: "класс",
     definition: "Определение",
     facts: "Главное",
     examples: "Примеры из жизни",
@@ -147,115 +133,83 @@ function badge(x: number, y: number, size: number, name: IconName, fill: ColorRo
   ];
 }
 
-function image(box: Box, l: (typeof copy)[Language]): SlideElement {
+function image(box: Box, l: Copy): SlideElement {
   return { type: "image", ...box, label: l.image.label, prompt: l.image.prompt };
 }
 
+type Copy = (typeof copy)[Language];
+/** Страницы слайда: обычно одна, у длинных списков (факты, термины) — несколько */
+type Pages = { title: string; elements: SlideElement[]; decor?: boolean }[];
+const one = (title: string, elements: SlideElement[], withDecor = true): Pages => [{ title, elements, decor: withDecor }];
+
 export function buildSlides(pkg: TopicPackage, template: SlideTemplate): Slide[] {
   const l = copy[pkg.language];
-  const d = resolveDeck(pkg);
-  const slides: Slide[] = [];
-  const add = (kind: SlideKind, elements: SlideElement[], withDecor = true) =>
-    slides.push({ kind, elements: withDecor ? [...decor(template), ...elements] : elements });
-  const page = (base: string, i: number, total: number) => (total > 1 ? `${base} (${i + 1})` : base);
+  return structureOf(pkg).flatMap((spec) => {
+    const pages = isDataSlide(spec) ? dataPages(spec, pkg, l) : contentPages(spec.kind as ContentKind, pkg, l);
+    return pages.map((page) => ({
+      id: spec.id,
+      kind: spec.kind,
+      title: page.title,
+      elements: page.decor === false ? page.elements : [...decor(template), ...page.elements],
+    }));
+  });
+}
 
-  // 1. Титульный
-  add("title", [
-    { type: "rect", x: 6, y: 22, w: 10, h: 2, fill: "accent" },
-    {
-      type: "text",
-      x: 6,
-      y: 12,
-      w: 70,
-      h: 9,
-      text: `${messages[pkg.language].subjects[pkg.subject]} · ${pkg.grade}-${l.grade}`.toUpperCase(),
-      fontSize: 16,
-      color: "muted",
-      font: "body",
-      bold: true,
-      valign: "bottom",
-    },
-    text({ x: 6, y: 34, w: 80, h: 38 }, pkg.topic, 54, 28, { font: "heading", bold: true, valign: "middle" }),
-  ]);
+const page = (base: string, i: number, total: number) => (total > 1 ? `${base} (${i + 1})` : base);
 
-  // 2. Цели урока — три карточки с иконками
-  add("goals", [
-    heading(d.goals.title),
-    ...d.goals.items.flatMap(({ title, body }, i): SlideElement[] => {
-      const x = 6 + i * 30;
-      return [
-        { type: "rect", x, y: 26, w: 28, h: 64, fill: "surface", rounded: true },
-        ...badge(x + 2.5, 31, 7, (["lightbulb", "brain", "rocket"] as const)[i]),
-        text({ x: x + 2.5, y: 48, w: 23, h: 10 }, title, 22, 14, { font: "heading", bold: true, color: "accent", valign: "middle" }),
-        text({ x: x + 2.5, y: 59, w: 23, h: 26 }, body, 16, 11, { color: "muted" }),
-      ];
-    }),
-  ]);
+// ——— Слайды с содержанием темы ———
 
-  // 3. План урока — линия времени из четырёх шагов
-  add("plan", [
-    heading(d.plan.title),
-    { type: "rect", x: 12, y: 49, w: 76, h: 1.2, fill: "surface" },
-    ...d.plan.steps.flatMap(({ name: step, time: minutes }, i): SlideElement[] => {
-      const cx = 12 + i * (76 / 3);
-      return [
-        { type: "rect", x: cx - 4, y: 49.6 - sq(8) / 2, w: 8, h: sq(8), fill: "accent", rounded: "full" },
-        { type: "text", x: cx - 4, y: 49.6 - sq(8) / 2, w: 8, h: sq(8), text: String(i + 1), fontSize: 24, color: "onAccent", font: "heading", bold: true, align: "center", valign: "middle" },
-        text({ x: cx - 11, y: 66, w: 22, h: 10 }, step, 18, 12, { bold: true, align: "center", valign: "top" }),
-        text({ x: cx - 11, y: 76, w: 22, h: 7 }, minutes, 14, 10, { color: "muted", align: "center" }),
-      ];
-    }),
-  ]);
-
-  // 4. Определение (+ формула)
-  const hasFormula = Boolean(pkg.formula);
-  const definition: SlideElement[] = [
-    heading(l.definition),
-    text({ x: 6, y: 24, w: 88, h: hasFormula ? 38 : 66 }, pkg.definition, 30, 16, { valign: "top" }),
-  ];
-  if (pkg.formula) {
-    const variables = pkg.formula.variables.map((v) => `${v.symbol} — ${v.meaning}${v.unit ? `, ${v.unit}` : ""}`);
-    definition.push(
-      { type: "rect", x: 6, y: 66, w: 88, h: 26, fill: "surface", rounded: true },
-      { type: "text", x: 9, y: 68, w: 38, h: 22, text: pkg.formula.expression, fontSize: 28, color: "accent", font: "heading", bold: true, valign: "middle" },
-      text({ x: 49, y: 68, w: 43, h: 22 }, variables, 16, 10, { color: "muted", valign: "middle" }),
-    );
+function contentPages(kind: ContentKind, pkg: TopicPackage, l: Copy): Pages {
+  if (kind === "definition") {
+    const hasFormula = Boolean(pkg.formula);
+    const elements: SlideElement[] = [
+      heading(l.definition),
+      text({ x: 6, y: 24, w: 88, h: hasFormula ? 38 : 66 }, pkg.definition, 30, 16, { valign: "top" }),
+    ];
+    if (pkg.formula) {
+      const variables = pkg.formula.variables.map((v) => `${v.symbol} — ${v.meaning}${v.unit ? `, ${v.unit}` : ""}`);
+      elements.push(
+        { type: "rect", x: 6, y: 66, w: 88, h: 26, fill: "surface", rounded: true },
+        { type: "text", x: 9, y: 68, w: 38, h: 22, text: pkg.formula.expression, fontSize: 28, color: "accent", font: "heading", bold: true, valign: "middle" },
+        text({ x: 49, y: 68, w: 43, h: 22 }, variables, 16, 10, { color: "muted", valign: "middle" }),
+      );
+    }
+    return one(l.definition, elements);
   }
-  add("definition", definition);
 
-  // 5. Главные факты — до 5 на слайд
-  const factPages = chunk(pkg.keyFacts, 5);
-  factPages.forEach((facts, i) =>
-    add("facts", [
-      heading(page(l.facts, i, factPages.length)),
-      { type: "rect", x: 6, y: 24, w: 0.6, h: 66, fill: "accent" },
-      text({ x: 9, y: 24, w: 85, h: 66 }, facts, 24, 13, { valign: "top", bullet: true }),
-    ]),
-  );
+  // Главные факты — до 5 на слайд
+  if (kind === "facts") {
+    const pages = chunk(pkg.keyFacts, 5);
+    return pages.map((facts, i) => ({ title: page(l.facts, i, pages.length), elements: bulletList(page(l.facts, i, pages.length), facts) }));
+  }
 
-  // 6. Примеры — карточки 2 × 2
-  const examplePages = chunk(pkg.examples, 4);
-  examplePages.forEach((examples, i) =>
-    add("examples", [
-      heading(page(l.examples, i, examplePages.length)),
-      ...examples.flatMap((example, j): SlideElement[] => {
-        const x = 6 + (j % 2) * 45;
-        const y = 24 + Math.floor(j / 2) * 35;
-        return [
-          { type: "rect", x, y, w: 43, h: 32, fill: "surface", rounded: true },
-          { type: "rect", x: x + 2.5, y: y + 6, w: 5, h: 9, fill: "accent", rounded: true },
-          { type: "text", x: x + 2.5, y: y + 6, w: 5, h: 9, text: String(j + 1), fontSize: 18, color: "onAccent", font: "heading", bold: true, align: "center", valign: "middle" },
-          text({ x: x + 9.5, y: y + 3, w: 31, h: 26 }, example.text, 18, 10, { valign: "middle" }),
-        ];
-      }),
-    ]),
-  );
+  // Примеры — карточки 2 × 2
+  if (kind === "examples") {
+    const pages = chunk(pkg.examples, 4);
+    return pages.map((examples, i) => ({
+      title: page(l.examples, i, pages.length),
+      elements: [
+        heading(page(l.examples, i, pages.length)),
+        ...examples.flatMap((example, j): SlideElement[] => {
+          const x = 6 + (j % 2) * 45;
+          const y = 24 + Math.floor(j / 2) * 35;
+          return [
+            { type: "rect", x, y, w: 43, h: 32, fill: "surface", rounded: true },
+            { type: "rect", x: x + 2.5, y: y + 6, w: 5, h: 9, fill: "accent", rounded: true },
+            { type: "text", x: x + 2.5, y: y + 6, w: 5, h: 9, text: String(j + 1), fontSize: 18, color: "onAccent", font: "heading", bold: true, align: "center", valign: "middle" },
+            text({ x: x + 9.5, y: y + 3, w: 31, h: 26 }, example.text, 18, 10, { valign: "middle" }),
+          ];
+        }),
+      ],
+    }));
+  }
 
-  // 7. Термины — сетка 2 × 3
-  const termPages = chunk(pkg.terms, 6);
-  termPages.forEach((terms, i) =>
-    add("terms", [
-      heading(page(l.terms, i, termPages.length)),
+  // Термины — сетка 2 × 3
+  const pages = chunk(pkg.terms, 6);
+  return pages.map((terms, i) => ({
+    title: page(l.terms, i, pages.length),
+    elements: [
+      heading(page(l.terms, i, pages.length)),
       ...terms.flatMap((term, j): SlideElement[] => {
         const x = 6 + (j % 2) * 45;
         const y = 24 + Math.floor(j / 2) * 23.5;
@@ -265,148 +219,246 @@ export function buildSlides(pkg: TopicPackage, template: SlideTemplate): Slide[]
           text({ x: x + 2.5, y: y + 9.5, w: 38, h: 10 }, term.explanation, 14, 9, { color: "muted", valign: "top" }),
         ];
       }),
-    ]),
-  );
-
-  // 8. Текст + картинка
-  add(
-    "text-image",
-    [
-      heading(d.textImage.title, 44),
-      { type: "rect", x: 6, y: 23, w: 8, h: 1.2, fill: "accent" },
-      text({ x: 6, y: 30, w: 42, h: 58 }, d.textImage.bullets, 22, 14, { bullet: true, color: "muted" }),
-      image({ x: 53, y: 9, w: 41, h: 82 }, l),
     ],
-    false,
-  );
+  }));
+}
 
-  // 9. Большая картинка с подписью
-  add(
-    "big-image",
-    [
-      image({ x: 6, y: 8, w: 88, h: 68 }, l),
-      { type: "rect", x: 6, y: 79, w: 88, h: 13, fill: "accent", rounded: true },
-      text({ x: 9, y: 79, w: 82, h: 13 }, d.bigImage.caption, 20, 12, { color: "onAccent", valign: "middle", bold: true }),
-    ],
-    false,
-  );
+/** Заголовок + цветная полоса + список с маркерами (факты, «тізім» в отчётах) */
+function bulletList(title: string, lines: string[]): SlideElement[] {
+  return [
+    heading(title),
+    { type: "rect", x: 6, y: 24, w: 0.6, h: 66, fill: "accent" },
+    text({ x: 9, y: 24, w: 85, h: 66 }, lines, 24, 13, { valign: "top", bullet: true }),
+  ];
+}
 
-  // 10. Сравнение — две колонки и весы посередине
-  add("compare", [
-    heading(d.compare.title),
-    ...[d.compare.left, d.compare.right].flatMap((name, i): SlideElement[] => {
-      const x = i === 0 ? 6 : 55;
-      return [
-        { type: "rect", x, y: 25, w: 39, h: 66, fill: "surface", rounded: true },
-        { type: "rect", x, y: 25, w: 39, h: 13, fill: "accent", rounded: true },
-        text({ x: x + 2.5, y: 25, w: 34, h: 13 }, name, 22, 14, { color: "onAccent", bold: true, font: "heading", align: "center", valign: "middle" }),
-        text({ x: x + 3, y: 43, w: 33, h: 44 }, i === 0 ? d.compare.leftLines : d.compare.rightLines, 18, 12, { bullet: true, color: "muted" }),
+// ——— Слайды-заготовки ———
+
+function dataPages(spec: DataSlide, pkg: TopicPackage, l: Copy): Pages {
+  // switch по spec.kind сужает тип, поэтому slideData отдаёт данные именно этой раскладки
+  const data = <K extends LayoutKind>(s: Extract<DataSlide, { kind: K }>) => slideData<K>(pkg, s);
+  const icon = (i: number, fallback: IconName): IconName => spec.icons?.[i] ?? fallback;
+
+  switch (spec.kind) {
+    case "title": {
+      const d = data(spec);
+      const elements: SlideElement[] = [
+        { type: "rect", x: 6, y: 22, w: 10, h: 2, fill: "accent" },
+        { type: "text", x: 6, y: 12, w: 70, h: 9, text: d.kicker.toUpperCase(), fontSize: 16, color: "muted", font: "body", bold: true, valign: "bottom" },
+        text({ x: 6, y: 30, w: 80, h: 40 }, pkg.topic, 54, 26, { font: "heading", bold: true, valign: "middle" }),
       ];
-    }),
-    ...badge(46, 50, 8, "scale", "background", "accent"),
-  ]);
+      if (d.author.trim()) elements.push(text({ x: 6, y: 78, w: 70, h: 10 }, d.author, 18, 12, { color: "muted", valign: "middle" }));
+      return one(pkg.topic, elements);
+    }
 
-  // 11. Цифры — три больших числа
-  add("numbers", [
-    heading(d.numbers.title),
-    ...d.numbers.items.flatMap((item, i): SlideElement[] => {
-      const x = 6 + i * 30;
-      return [
-        { type: "rect", x, y: 30, w: 28, h: 1.2, fill: "accent" },
-        { type: "text", x, y: 34, w: 28, h: 26, text: item.value, fontSize: fitFontSize(item.value, { w: 28, h: 26 }, 72, 28), color: "accent", font: "heading", bold: true, valign: "middle" },
-        text({ x, y: 62, w: 26, h: 20 }, item.caption, 16, 11, { color: "muted" }),
-      ];
-    }),
-  ]);
+    // Три карточки с иконками: цели, методы, достижения
+    case "goals": {
+      const d = data(spec);
+      const fallback: IconName[] = ["lightbulb", "brain", "rocket"];
+      return one(d.title, [
+        heading(d.title),
+        ...d.items.flatMap(({ title, body }, i): SlideElement[] => {
+          const x = 6 + i * 30;
+          return [
+            { type: "rect", x, y: 26, w: 28, h: 64, fill: "surface", rounded: true },
+            ...badge(x + 2.5, 31, 7, icon(i, fallback[i])),
+            text({ x: x + 2.5, y: 48, w: 23, h: 10 }, title, 22, 12, { font: "heading", bold: true, color: "accent", valign: "middle" }),
+            text({ x: x + 2.5, y: 59, w: 23, h: 26 }, body, 16, 10, { color: "muted" }),
+          ];
+        }),
+      ]);
+    }
 
-  // 12. Таблица: строка заголовков на цветной плашке, строки через одну с подложкой
-  const columns = d.table.columns;
-  const rowH = Math.min(12, 66 / (d.table.rows.length + 1));
-  const colW = 88 / columns.length;
-  const cells = (values: string[], y: number, header: boolean): SlideElement[] =>
-    columns.map((_, c) =>
-      text({ x: 6 + c * colW + 1.2, y, w: colW - 2.4, h: rowH }, values[c] ?? "", header ? 18 : 16, 9, {
-        valign: "middle",
-        bold: header,
-        color: header ? "onAccent" : "text",
-      }),
-    );
-  add("table", [
-    heading(d.table.title),
-    { type: "rect", x: 6, y: 24, w: 88, h: rowH, fill: "accent", rounded: true },
-    ...cells(columns, 24, true),
-    ...d.table.rows.flatMap((row, r): SlideElement[] => {
-      const y = 24 + (r + 1) * rowH;
-      return [...(r % 2 === 1 ? [{ type: "rect", x: 6, y, w: 88, h: rowH, fill: "surface" } as const] : []), ...cells(row, y, false)];
-    }),
-    { type: "rect", x: 6, y: 24 + (d.table.rows.length + 1) * rowH, w: 88, h: 0.6, fill: "surface" },
-  ]);
+    // Линия времени из четырёх шагов: план урока, повестка, план на год
+    case "plan": {
+      const d = data(spec);
+      return one(d.title, [
+        heading(d.title),
+        { type: "rect", x: 12, y: 49, w: 76, h: 1.2, fill: "surface" },
+        ...d.steps.flatMap(({ name, time }, i): SlideElement[] => {
+          const cx = 12 + i * (76 / 3);
+          return [
+            { type: "rect", x: cx - 4, y: 49.6 - sq(8) / 2, w: 8, h: sq(8), fill: "accent", rounded: "full" },
+            { type: "text", x: cx - 4, y: 49.6 - sq(8) / 2, w: 8, h: sq(8), text: String(i + 1), fontSize: 24, color: "onAccent", font: "heading", bold: true, align: "center", valign: "middle" },
+            text({ x: cx - 11, y: 66, w: 22, h: 10 }, name, 18, 11, { bold: true, align: "center", valign: "top" }),
+            text({ x: cx - 11, y: 76, w: 22, h: 7 }, time, 14, 10, { color: "muted", align: "center" }),
+          ];
+        }),
+      ]);
+    }
 
-  // 13. Диаграмма — столбики, высота пропорциональна значению
-  const items = d.chart.items;
-  const max = Math.max(1, ...items.map((item) => item.value));
-  const slot = 84 / items.length;
-  const barW = Math.min(14, slot * 0.6);
-  const number = (value: number) => String(Math.round(value * 100) / 100).replace(".", ",");
-  add("chart", [
-    heading(d.chart.title),
-    ...items.flatMap((item, i): SlideElement[] => {
-      const h = Math.max(0.8, (item.value / max) * 46);
-      const x = 8 + i * slot + (slot - barW) / 2;
-      return [
-        { type: "rect", x, y: 78 - h, w: barW, h, fill: "accent" },
-        { type: "text", x: x - 3, y: 78 - h - 8, w: barW + 6, h: 7, text: number(item.value), fontSize: 16, color: "accent", font: "heading", bold: true, align: "center", valign: "bottom" },
-        text({ x: 8 + i * slot, y: 80, w: slot, h: 11 }, item.label, 15, 9, { color: "muted", align: "center", valign: "top" }),
-      ];
-    }),
-    { type: "rect", x: 6, y: 78, w: 88, h: 0.6, fill: "muted" },
-  ]);
+    case "bullets": {
+      const d = data(spec);
+      return one(d.title, bulletList(d.title, d.lines));
+    }
 
-  // 14. Вопрос для обсуждения
-  add("think", [
-    { type: "icon", name: "question", color: "accent", x: 6, y: 22, w: 24, h: sq(24) },
-    text({ x: 35, y: 16, w: 59, h: 14 }, d.think.title, 30, 20, { color: "accent", font: "heading", bold: true, valign: "bottom" }),
-    text({ x: 35, y: 32, w: 59, h: 40 }, d.think.question, 34, 18, { font: "heading", bold: true, valign: "middle" }),
-    { type: "rect", x: 35, y: 76, w: 44, h: 11, fill: "surface", rounded: true },
-    text({ x: 37, y: 76, w: 40, h: 11 }, d.think.hint, 15, 10, { color: "muted", valign: "middle" }),
-  ]);
+    case "text-image": {
+      const d = data(spec);
+      return one(
+        d.title,
+        [
+          heading(d.title, 44),
+          { type: "rect", x: 6, y: 23, w: 8, h: 1.2, fill: "accent" },
+          text({ x: 6, y: 30, w: 42, h: 58 }, d.bullets, 22, 12, { bullet: true, color: "muted" }),
+          image({ x: 53, y: 9, w: 41, h: 82 }, l),
+        ],
+        false,
+      );
+    }
 
-  // 15. Задание + дескрипторы оценивания
-  add("task", [
-    heading(d.task.title),
-    { type: "rect", x: 6, y: 25, w: 53, h: 66, fill: "surface", rounded: true },
-    ...badge(9, 30, 6, "notebook"),
-    text({ x: 18, y: 30, w: 38, h: sq(6) }, d.task.name, 22, 14, { bold: true, font: "heading", valign: "middle" }),
-    text({ x: 9, y: 48, w: 47, h: 40 }, d.task.lines, 18, 12, { bullet: true, color: "muted" }),
-    { type: "rect", x: 62, y: 25, w: 32, h: 66, fill: "accent", rounded: true },
-    text({ x: 65, y: 29, w: 27, h: 10 }, d.task.criteriaTitle, 20, 13, { color: "onAccent", bold: true, font: "heading", valign: "middle" }),
-    ...d.task.criteria.flatMap((item, i): SlideElement[] => [
-      { type: "icon", name: "check", color: "onAccent", x: 65, y: 44 + i * 15, w: 3.5, h: sq(3.5) },
-      text({ x: 70, y: 43 + i * 15, w: 22, h: 12 }, item, 15, 10, { color: "onAccent", valign: "top" }),
-    ]),
-  ]);
+    case "big-image": {
+      const d = data(spec);
+      return one(
+        d.caption,
+        [
+          image({ x: 6, y: 8, w: 88, h: 68 }, l),
+          { type: "rect", x: 6, y: 79, w: 88, h: 13, fill: "accent", rounded: true },
+          text({ x: 9, y: 79, w: 82, h: 13 }, d.caption, 20, 12, { color: "onAccent", valign: "middle", bold: true }),
+        ],
+        false,
+      );
+    }
 
-  // 16. Рефлексия — три «стикера» с началом фразы
-  add("reflection", [
-    heading(d.reflection.title),
-    ...d.reflection.items.flatMap((item, i): SlideElement[] => {
-      const x = 6 + i * 30;
-      return [
-        { type: "rect", x, y: 27, w: 28, h: 60, fill: "surface", rounded: true },
-        ...badge(x + 10.5, 33, 7, (["star", "puzzle", "heart"] as const)[i]),
-        text({ x: x + 2.5, y: 52, w: 23, h: 30 }, item, 20, 13, { font: "heading", bold: true, align: "center", valign: "top" }),
-      ];
-    }),
-  ]);
+    // Две колонки и весы посередине
+    case "compare": {
+      const d = data(spec);
+      return one(d.title, [
+        heading(d.title),
+        ...[d.left, d.right].flatMap((name, i): SlideElement[] => {
+          const x = i === 0 ? 6 : 55;
+          return [
+            { type: "rect", x, y: 25, w: 39, h: 66, fill: "surface", rounded: true },
+            { type: "rect", x, y: 25, w: 39, h: 13, fill: "accent", rounded: true },
+            text({ x: x + 2.5, y: 25, w: 34, h: 13 }, name, 22, 13, { color: "onAccent", bold: true, font: "heading", align: "center", valign: "middle" }),
+            text({ x: x + 3, y: 43, w: 33, h: 44 }, i === 0 ? d.leftLines : d.rightLines, 18, 11, { bullet: true, color: "muted" }),
+          ];
+        }),
+        ...badge(46, 50, 8, "scale", "background", "accent"),
+      ]);
+    }
 
-  // 17. Домашнее задание и «спасибо за урок»
-  add("homework", [
-    ...badge(6, 10, 8, "house"),
-    text({ x: 17, y: 10, w: 60, h: sq(8) }, d.homework.title, 30, 20, { color: "accent", font: "heading", bold: true, valign: "middle" }),
-    text({ x: 6, y: 34, w: 50, h: 30 }, d.homework.lines, 22, 14, { bullet: true }),
-    { type: "rect", x: 6, y: 74, w: 88, h: 1.2, fill: "surface" },
-    text({ x: 6, y: 78, w: 88, h: 14 }, d.homework.thanks, 32, 20, { color: "accent", font: "heading", bold: true, valign: "middle" }),
-  ]);
+    // Три больших числа
+    case "numbers": {
+      const d = data(spec);
+      return one(d.title, [
+        heading(d.title),
+        ...d.items.flatMap((item, i): SlideElement[] => {
+          const x = 6 + i * 30;
+          return [
+            { type: "rect", x, y: 30, w: 28, h: 1.2, fill: "accent" },
+            { type: "text", x, y: 34, w: 28, h: 26, text: item.value, fontSize: fitFontSize(item.value, { w: 28, h: 26 }, 72, 24), color: "accent", font: "heading", bold: true, valign: "middle" },
+            text({ x, y: 62, w: 26, h: 20 }, item.caption, 16, 10, { color: "muted" }),
+          ];
+        }),
+      ]);
+    }
 
-  return slides;
+    // Таблица: строка заголовков на цветной плашке, строки через одну с подложкой
+    case "table": {
+      const d = data(spec);
+      const columns = d.columns;
+      const rowH = Math.min(12, 66 / (d.rows.length + 1));
+      const colW = 88 / columns.length;
+      const cells = (values: string[], y: number, header: boolean): SlideElement[] =>
+        columns.map((_, c) =>
+          text({ x: 6 + c * colW + 1.2, y, w: colW - 2.4, h: rowH }, values[c] ?? "", header ? 18 : 16, 9, {
+            valign: "middle",
+            bold: header,
+            color: header ? "onAccent" : "text",
+          }),
+        );
+      return one(d.title, [
+        heading(d.title),
+        { type: "rect", x: 6, y: 24, w: 88, h: rowH, fill: "accent", rounded: true },
+        ...cells(columns, 24, true),
+        ...d.rows.flatMap((row, r): SlideElement[] => {
+          const y = 24 + (r + 1) * rowH;
+          return [...(r % 2 === 1 ? [{ type: "rect", x: 6, y, w: 88, h: rowH, fill: "surface" } as const] : []), ...cells(row, y, false)];
+        }),
+        { type: "rect", x: 6, y: 24 + (d.rows.length + 1) * rowH, w: 88, h: 0.6, fill: "surface" },
+      ]);
+    }
+
+    // Диаграмма — столбики, высота пропорциональна значению
+    case "chart": {
+      const d = data(spec);
+      const items = d.items;
+      const max = Math.max(1, ...items.map((item) => item.value));
+      const slot = 84 / items.length;
+      const barW = Math.min(14, slot * 0.6);
+      const number = (value: number) => String(Math.round(value * 100) / 100).replace(".", ",");
+      return one(d.title, [
+        heading(d.title),
+        ...items.flatMap((item, i): SlideElement[] => {
+          const h = Math.max(0.8, (item.value / max) * 46);
+          const x = 8 + i * slot + (slot - barW) / 2;
+          return [
+            { type: "rect", x, y: 78 - h, w: barW, h, fill: "accent" },
+            { type: "text", x: x - 3, y: 78 - h - 8, w: barW + 6, h: 7, text: number(item.value), fontSize: 16, color: "accent", font: "heading", bold: true, align: "center", valign: "bottom" },
+            text({ x: 8 + i * slot, y: 80, w: slot, h: 11 }, item.label, 15, 9, { color: "muted", align: "center", valign: "top" }),
+          ];
+        }),
+        { type: "rect", x: 6, y: 78, w: 88, h: 0.6, fill: "muted" },
+      ]);
+    }
+
+    // Крупный вопрос или цитата с иконкой слева
+    case "think": {
+      const d = data(spec);
+      return one(d.title, [
+        { type: "icon", name: icon(0, "question"), color: "accent", x: 6, y: 22, w: 24, h: sq(24) },
+        text({ x: 35, y: 16, w: 59, h: 14 }, d.title, 30, 18, { color: "accent", font: "heading", bold: true, valign: "bottom" }),
+        text({ x: 35, y: 32, w: 59, h: 40 }, d.question, 34, 16, { font: "heading", bold: true, valign: "middle" }),
+        { type: "rect", x: 35, y: 76, w: 44, h: 11, fill: "surface", rounded: true },
+        text({ x: 37, y: 76, w: 40, h: 11 }, d.hint, 15, 10, { color: "muted", valign: "middle" }),
+      ]);
+    }
+
+    // Задание + дескрипторы оценивания
+    case "task": {
+      const d = data(spec);
+      return one(d.title, [
+        heading(d.title),
+        { type: "rect", x: 6, y: 25, w: 53, h: 66, fill: "surface", rounded: true },
+        ...badge(9, 30, 6, icon(0, "notebook")),
+        text({ x: 18, y: 30, w: 38, h: sq(6) }, d.name, 22, 13, { bold: true, font: "heading", valign: "middle" }),
+        text({ x: 9, y: 48, w: 47, h: 40 }, d.lines, 18, 11, { bullet: true, color: "muted" }),
+        { type: "rect", x: 62, y: 25, w: 32, h: 66, fill: "accent", rounded: true },
+        text({ x: 65, y: 29, w: 27, h: 10 }, d.criteriaTitle, 20, 12, { color: "onAccent", bold: true, font: "heading", valign: "middle" }),
+        ...d.criteria.flatMap((item, i): SlideElement[] => [
+          { type: "icon", name: "check", color: "onAccent", x: 65, y: 44 + i * 15, w: 3.5, h: sq(3.5) },
+          text({ x: 70, y: 43 + i * 15, w: 22, h: 12 }, item, 15, 9, { color: "onAccent", valign: "top" }),
+        ]),
+      ]);
+    }
+
+    // Три «стикера» с началом фразы
+    case "reflection": {
+      const d = data(spec);
+      const fallback: IconName[] = ["star", "puzzle", "heart"];
+      return one(d.title, [
+        heading(d.title),
+        ...d.items.flatMap((item, i): SlideElement[] => {
+          const x = 6 + i * 30;
+          return [
+            { type: "rect", x, y: 27, w: 28, h: 60, fill: "surface", rounded: true },
+            ...badge(x + 10.5, 33, 7, icon(i, fallback[i])),
+            text({ x: x + 2.5, y: 52, w: 23, h: 30 }, item, 20, 12, { font: "heading", bold: true, align: "center", valign: "top" }),
+          ];
+        }),
+      ]);
+    }
+
+    // Последний слайд: домашнее задание, выводы или контакты + «спасибо»
+    case "homework": {
+      const d = data(spec);
+      return one(d.title, [
+        ...badge(6, 10, 8, icon(0, "house")),
+        text({ x: 17, y: 10, w: 60, h: sq(8) }, d.title, 30, 18, { color: "accent", font: "heading", bold: true, valign: "middle" }),
+        text({ x: 6, y: 34, w: 60, h: 34 }, d.lines, 22, 12, { bullet: true }),
+        { type: "rect", x: 6, y: 74, w: 88, h: 1.2, fill: "surface" },
+        text({ x: 6, y: 78, w: 88, h: 14 }, d.thanks, 32, 18, { color: "accent", font: "heading", bold: true, valign: "middle" }),
+      ]);
+    }
+  }
 }

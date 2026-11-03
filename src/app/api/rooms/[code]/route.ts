@@ -1,5 +1,5 @@
 import { apiError } from "@/lib/api-errors";
-import { sortResults, toResult } from "@/lib/rooms";
+import { questionStats, raceForTeacher, sortResults, toResult } from "@/lib/rooms";
 import { finishRoom, getRoom, listPlayers } from "@/lib/storage/rooms";
 
 // GET /api/rooms/:code — таблица результатов для экрана учителя
@@ -16,6 +16,8 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/rooms/[code
     status: room.status,
     total: room.questions.length,
     results: sortResults(players.map(toResult)),
+    stats: questionStats(room, players),
+    race: room.live && raceForTeacher(room, players),
   });
 }
 

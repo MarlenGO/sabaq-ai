@@ -49,7 +49,8 @@ export function GamesPanel({ lesson, mode, readOnly, initialGame, onChange, onJe
   const [playMode, setPlayMode] = useState<"screen" | "qr">("screen");
   const t = useT();
   const game = games.find((g) => g.id === gameId) ?? games[0];
-  const viaQr = !readOnly && game.qr && playMode === "qr";
+  // «Жарыс» идёт только через телефоны, у него нет режима «на экране»
+  const viaQr = !readOnly && game.qr && (game.live || playMode === "qr");
 
   // В историю пишем игру на экране один раз, при первом ответе
   // (просто открыть и посмотреть — это ещё не игра)
@@ -66,7 +67,7 @@ export function GamesPanel({ lesson, mode, readOnly, initialGame, onChange, onJe
       <div
         role="radiogroup"
         aria-label={t.games_ui.kind}
-        className={`grid gap-3 sm:grid-cols-2 lg:grid-cols-4 ${readOnly && initialGame ? "hidden" : ""}`}
+        className={`grid gap-3 sm:grid-cols-2 lg:grid-cols-3 ${readOnly && initialGame ? "hidden" : ""}`}
       >
         {games.map((g) => {
           const selected = g.id === gameId;
@@ -98,7 +99,9 @@ export function GamesPanel({ lesson, mode, readOnly, initialGame, onChange, onJe
       {mode === "preview" && !readOnly && (
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-subhead font-semibold">{t.games_ui.how}</span>
-          {game.qr ? (
+          {game.live ? (
+            <span className="text-subhead text-label-2">{t.games_ui.liveOnly}</span>
+          ) : game.qr ? (
             <SegmentedControl
               size="lg"
               ariaLabel={t.games_ui.howLabel}
@@ -113,9 +116,7 @@ export function GamesPanel({ lesson, mode, readOnly, initialGame, onChange, onJe
             <span className="text-subhead text-label-2">{t.games_ui.screenOnly}</span>
           )}
           <span className="w-full text-footnote text-label-2">
-            {viaQr
-              ? t.games_ui.qrHint
-              : t.games_ui.screenHint}
+            {game.live ? t.games_ui.liveHint : viaQr ? t.games_ui.qrHint : t.games_ui.screenHint}
           </span>
         </div>
       )}
@@ -136,7 +137,10 @@ export function GamesPanel({ lesson, mode, readOnly, initialGame, onChange, onJe
         // key: при смене игры плеер начинается заново
         <GameStage key={game.id}>
           {game.id === "test" && <QuestionPlayer questions={lesson.quiz} variant="test" onFirstAnswer={logPlay} />}
-          {game.id === "quiz" && <QuestionPlayer questions={lesson.quiz} variant="quiz" onFirstAnswer={logPlay} />}
+          {/* «Жарыс» здесь только в режиме просмотра из истории — показываем его вопросы */}
+          {(game.id === "quiz" || game.id === "race") && (
+            <QuestionPlayer questions={lesson.quiz} variant="quiz" onFirstAnswer={logPlay} />
+          )}
           {game.id === "true-false" && (
             <TrueFalsePlayer items={lesson.trueFalse} language={lesson.language} onFirstAnswer={logPlay} />
           )}

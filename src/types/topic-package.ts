@@ -131,37 +131,48 @@ export const jeopardyStoredSchema = z.object({
     .max(limits.jeopardy[1]),
 });
 
-// Тексты слайдов-заготовок, которые учитель поменял в конструкторе.
-// Раздела нет — на слайде текст-подсказка по умолчанию (src/slides/deck.ts).
-// Пустые строки разрешены: это заготовки, учитель может дописать их в PowerPoint.
+// Вид презентации — её структура: какие слайды и с какими текстами.
+// Урок, открытый урок/конкурс, отчёт для комиссии и т.д. (см. src/slides/structures.ts).
+// Это не то же, что стиль (templateId): стиль — только цвета и шрифты.
+// Новые виды можно добавлять в конец без смены schemaVersion.
+export const deckTypeSchema = z.enum(["lesson", "open-lesson", "report", "talk", "class-hour", "parents", "attestation"]);
+
+// Данные слайдов-заготовок по раскладке. Пустые строки разрешены: это заготовки,
+// учитель может дописать их в PowerPoint.
 const line = z.string().max(400);
 const lines = z.array(line).min(limits.deckLines[0]).max(limits.deckLines[1]);
-export const deckSchema = z
-  .object({
-    goals: z.object({ title: line, items: z.array(z.object({ title: line, body: line })).length(3) }),
-    plan: z.object({ title: line, steps: z.array(z.object({ name: line, time: line })).length(4) }),
-    textImage: z.object({ title: line, bullets: lines }),
-    bigImage: z.object({ caption: line }),
-    compare: z.object({ title: line, left: line, right: line, leftLines: lines, rightLines: lines }),
-    numbers: z.object({ title: line, items: z.array(z.object({ value: line, caption: line })).length(3) }),
-    table: z.object({
-      title: line,
-      columns: z.array(line).min(limits.tableColumns[0]).max(limits.tableColumns[1]),
-      rows: z.array(z.array(line)).min(limits.tableRows[0]).max(limits.tableRows[1]),
-    }),
-    chart: z.object({
-      title: line,
-      items: z
-        .array(z.object({ label: line, value: z.number().min(0).max(1e9) }))
-        .min(limits.chartItems[0])
-        .max(limits.chartItems[1]),
-    }),
-    think: z.object({ title: line, question: line, hint: line }),
-    task: z.object({ title: line, name: line, lines, criteriaTitle: line, criteria: z.array(line).length(3) }),
-    reflection: z.object({ title: line, items: z.array(line).length(3) }),
-    homework: z.object({ title: line, lines, thanks: line }),
-  })
-  .partial();
+export const layoutSchemas = {
+  title: z.object({ kicker: line, author: line }),
+  goals: z.object({ title: line, items: z.array(z.object({ title: line, body: line })).length(3) }),
+  plan: z.object({ title: line, steps: z.array(z.object({ name: line, time: line })).length(4) }),
+  bullets: z.object({ title: line, lines }),
+  "text-image": z.object({ title: line, bullets: lines }),
+  "big-image": z.object({ caption: line }),
+  compare: z.object({ title: line, left: line, right: line, leftLines: lines, rightLines: lines }),
+  numbers: z.object({ title: line, items: z.array(z.object({ value: line, caption: line })).length(3) }),
+  table: z.object({
+    title: line,
+    columns: z.array(line).min(limits.tableColumns[0]).max(limits.tableColumns[1]),
+    rows: z.array(z.array(line)).min(limits.tableRows[0]).max(limits.tableRows[1]),
+  }),
+  chart: z.object({
+    title: line,
+    items: z
+      .array(z.object({ label: line, value: z.number().min(0).max(1e9) }))
+      .min(limits.chartItems[0])
+      .max(limits.chartItems[1]),
+  }),
+  think: z.object({ title: line, question: line, hint: line }),
+  task: z.object({ title: line, name: line, lines, criteriaTitle: line, criteria: z.array(line).length(3) }),
+  reflection: z.object({ title: line, items: z.array(line).length(3) }),
+  homework: z.object({ title: line, lines, thanks: line }),
+};
+
+// Что учитель поменял в конструкторе: id слайда → его данные (целиком заменяют
+// подсказку). Проверка формы — по раскладке слайда при чтении (slideData),
+// поэтому здесь любой объект: так данные разных видов презентаций не мешают друг другу.
+// Ключи у вида «урок» — прежние (goals, textImage…), старые уроки читаются как раньше.
+export const deckSchema = z.record(z.string().max(40), z.looseObject({}));
 
 export const topicPackageSchema = packageContentSchema.extend({
   subject: subjectSchema,
@@ -174,8 +185,8 @@ export const topicPackageSchema = packageContentSchema.extend({
   language: languageSchema,
   /** Код цели обучения из программы РК, например "7.2.1.1" */
   curriculumCode: z.string().optional(),
-  /** ai — сгенерировано, demo — подставлен пример, потому что нет ключа AI */
-  source: z.enum(["ai", "demo"]),
+  /** ai — сгенерировано, demo — подставлен пример (нет ключа AI), empty — пустой проект: пишет учитель */
+  source: z.enum(["ai", "demo", "empty"]),
   createdAt: z.string(),
   updatedAt: z.string(),
   jeopardy: jeopardyStoredSchema.optional(),
@@ -183,6 +194,8 @@ export const topicPackageSchema = packageContentSchema.extend({
   templateId: z.string().optional(),
   /** Тексты слайдов-заготовок из конструктора */
   deck: deckSchema.optional(),
+  /** Вид презентации; если нет — урок */
+  deckType: deckTypeSchema.optional(),
 });
 
 export type Language = z.infer<typeof languageSchema>;
@@ -196,7 +209,9 @@ export type Jeopardy = z.infer<typeof jeopardyStoredSchema>;
 export type TopicPackage = z.infer<typeof topicPackageSchema>;
 export type Term = TopicPackage["terms"][number];
 export type Example = TopicPackage["examples"][number];
-export type Deck = Required<z.infer<typeof deckSchema>>;
+export type DeckType = z.infer<typeof deckTypeSchema>;
+export type LayoutKind = keyof typeof layoutSchemas;
+export type LayoutData<K extends LayoutKind> = z.infer<(typeof layoutSchemas)[K]>;
 
 // Что приходит из формы на главной
 export const lessonRequestSchema = z.object({
@@ -204,5 +219,8 @@ export const lessonRequestSchema = z.object({
   grade: z.number().int().min(1).max(11),
   language: languageSchema,
   subject: subjectSchema.default("physics"),
+  /** empty — пустая заготовка без AI: учитель пишет сам или по кнопке «AI» у каждой части */
+  mode: z.enum(["ai", "empty"]).default("ai"),
+  deckType: deckTypeSchema.default("lesson"),
 });
 export type LessonRequest = z.infer<typeof lessonRequestSchema>;

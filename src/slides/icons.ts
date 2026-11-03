@@ -1,4 +1,5 @@
 import {
+  Award,
   BookOpen,
   Brain,
   CircleCheck,
@@ -13,6 +14,15 @@ import {
   Scale,
   Star,
   Target,
+  Flag,
+  GraduationCap,
+  Handshake,
+  MessagesSquare,
+  Quote,
+  School,
+  Smile,
+  Trophy,
+  Users,
 } from "lucide-static";
 
 // Иконки для слайдов из Lucide (лицензия ISC — можно свободно использовать).
@@ -35,6 +45,16 @@ const icons = {
   scale: Scale,
   star: Star,
   target: Target,
+  award: Award,
+  flag: Flag,
+  graduation: GraduationCap,
+  handshake: Handshake,
+  messages: MessagesSquare,
+  quote: Quote,
+  school: School,
+  smile: Smile,
+  trophy: Trophy,
+  users: Users,
 };
 
 export type IconName = keyof typeof icons;

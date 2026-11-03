@@ -14,7 +14,9 @@ import { SlideEditor } from "@/components/slides/SlideEditor";
 import { SlidePreview } from "@/components/slides/SlidePreview";
 import { DownloadPptxButton } from "@/components/slides/DownloadPptxButton";
 import { TemplatePicker } from "@/components/slides/TemplatePicker";
+import { DeckTypePicker, FillDeckButton } from "@/components/slides/DeckTypePicker";
 import { GamesPanel } from "./GamesPanel";
+import { AiProvider } from "./AiButton";
 
 type Tab = "slides" | "games";
 type Mode = "edit" | "preview";
@@ -30,12 +32,14 @@ interface LessonWorkspaceProps {
   readOnly: boolean;
   /** Какую игру открыть сразу (из истории) */
   game?: GameId;
+  /** Есть ли ключ AI — тогда в конструкторе видны кнопки «AI» */
+  aiEnabled: boolean;
 }
 
 // Рабочее место урока: презентация или игры (что выбрано на главной) и переключатель
 // «Конструктор / Алдын ала көру». Правки сохраняются на сервер сами
 // через секунду после последнего изменения.
-export function LessonWorkspace({ initial, tab, readOnly, game }: LessonWorkspaceProps) {
+export function LessonWorkspace({ initial, tab, readOnly, game, aiEnabled }: LessonWorkspaceProps) {
   const [lesson, setLesson] = useState(initial);
   const t = useT();
   const [editMode, setMode] = useState<Mode>("preview");
@@ -96,6 +100,12 @@ export function LessonWorkspace({ initial, tab, readOnly, game }: LessonWorkspac
         )}
       </header>
 
+      {lesson.source === "empty" && !readOnly && (
+        <Card className="mt-4 bg-accent/10 p-4 text-subhead shadow-none">
+          <b>{t.lesson.empty}</b> {t.lesson.emptyText}
+        </Card>
+      )}
+
       {lesson.source === "demo" && (
         <Card className="mt-4 bg-orange/12 p-4 text-subhead shadow-none">
           <b>{t.lesson.demo}</b> {t.lesson.demoText}
@@ -130,42 +140,59 @@ export function LessonWorkspace({ initial, tab, readOnly, game }: LessonWorkspac
         </div>
       )}
 
-      <div className="mt-6">
-        {tab === "slides" ? (
-          <div className="flex flex-col gap-6">
-            {mode === "edit" ? (
-              <>
-                <SlideEditor pkg={lesson} onChange={update} />
-                <DownloadPptxButton pkg={lesson} />
-              </>
-            ) : (
-              <>
-                {!readOnly && (
-                  <section>
-                    <h2 className="mb-3 text-title3 font-semibold">{t.lesson.chooseTemplate}</h2>
-                    <TemplatePicker
-                      pkg={lesson}
-                      value={getTemplate(lesson.templateId, lesson.subject).id}
-                      onChange={(templateId) => update({ ...lesson, templateId })}
-                    />
-                  </section>
-                )}
-                <DownloadPptxButton pkg={lesson} />
-                <SlidePreview pkg={lesson} />
-              </>
-            )}
-          </div>
-        ) : (
-          <GamesPanel
-            lesson={lesson}
-            mode={mode}
-            readOnly={readOnly}
-            initialGame={game}
-            onChange={update}
-            onJeopardyReady={(jeopardy, updatedAt) => setLesson({ ...lesson, jeopardy, updatedAt })}
-          />
-        )}
-      </div>
+      <AiProvider lessonId={lesson.id} enabled={aiEnabled && !readOnly}>
+        <div className="mt-6">
+          {tab === "slides" ? (
+            <div className="flex flex-col gap-6">
+              {mode === "edit" ? (
+                <>
+                  <SlideEditor pkg={lesson} onChange={update} />
+                  <DownloadPptxButton pkg={lesson} />
+                </>
+              ) : (
+                <>
+                  {!readOnly && (
+                    <section className="flex flex-col gap-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <h2 className="text-title3 font-semibold">{t.lesson.chooseType}</h2>
+                          <p className="mt-0.5 text-footnote text-label-2">{t.lesson.typeHint}</p>
+                        </div>
+                        <FillDeckButton pkg={lesson} onChange={update} />
+                      </div>
+                      <DeckTypePicker
+                        value={lesson.deckType ?? "lesson"}
+                        onChange={(deckType) => update({ ...lesson, deckType })}
+                      />
+                    </section>
+                  )}
+                  {!readOnly && (
+                    <section>
+                      <h2 className="mb-3 text-title3 font-semibold">{t.lesson.chooseTemplate}</h2>
+                      <TemplatePicker
+                        pkg={lesson}
+                        value={getTemplate(lesson.templateId, lesson.subject).id}
+                        onChange={(templateId) => update({ ...lesson, templateId })}
+                      />
+                    </section>
+                  )}
+                  <DownloadPptxButton pkg={lesson} />
+                  <SlidePreview pkg={lesson} />
+                </>
+              )}
+            </div>
+          ) : (
+            <GamesPanel
+              lesson={lesson}
+              mode={mode}
+              readOnly={readOnly}
+              initialGame={game}
+              onChange={update}
+              onJeopardyReady={(jeopardy, updatedAt) => setLesson({ ...lesson, jeopardy, updatedAt })}
+            />
+          )}
+        </div>
+      </AiProvider>
     </main>
   );
 }

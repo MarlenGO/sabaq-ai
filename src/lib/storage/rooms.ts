@@ -55,15 +55,32 @@ export async function getRoom(code: string): Promise<Room | null> {
 }
 
 export async function finishRoom(code: string) {
-  const room = await getRoom(code);
-  if (!room) return null;
-  const finished = { ...room, status: "finished" as const };
-  await writeFile(roomFile(code), JSON.stringify(finished, null, 2), "utf8");
-  return finished;
+  return updateRoom(code, (room) => ({
+    ...room,
+    status: "finished",
+    live: room.live && { ...room.live, phase: "finished" },
+  }));
 }
 
-export async function addPlayer(code: string, name: string): Promise<Player> {
-  const player: Player = { id: randomBytes(8).toString("hex"), name, joinedAt: new Date().toISOString(), answers: [] };
+/** Изменить комнату (ход «Жарыса»): изменения идут по очереди, как ответы ученика */
+export function updateRoom(code: string, change: (room: Room) => Room | null) {
+  return withLock(`room/${code}`, async () => {
+    const room = await getRoom(code);
+    const updated = room && change(room);
+    if (!updated) return null;
+    await writeFile(roomFile(code), JSON.stringify(updated, null, 2), "utf8");
+    return updated;
+  });
+}
+
+export async function addPlayer(code: string, name: string, extra: Pick<Player, "order" | "optionOrders"> = {}): Promise<Player> {
+  const player: Player = {
+    id: randomBytes(8).toString("hex"),
+    name,
+    joinedAt: new Date().toISOString(),
+    answers: [],
+    ...extra,
+  };
   await writeFile(playerFile(code, player.id), JSON.stringify(player), "utf8");
   return player;
 }

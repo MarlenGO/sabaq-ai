@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { topicPackageSchema, type LessonRequest, type TopicPackage } from "@/types/topic-package";
@@ -12,14 +12,19 @@ import { topicPackageSchema, type LessonRequest, type TopicPackage } from "@/typ
 
 const DIR = path.join(process.cwd(), "data", "lessons");
 
-// id — короткий хэш от «тема + класс + язык + предмет». Одинаковый запрос даёт
+// id — короткий хэш от «тема + класс + язык + предмет + вид презентации». Одинаковый запрос даёт
 // тот же id, поэтому повторная генерация не нужна: это и есть кэш тем.
 // Физика — без добавки, чтобы уроки, созданные до выбора предмета, находились по-прежнему.
-export function lessonId({ topic, grade, language, subject }: LessonRequest) {
+export function lessonId({ topic, grade, language, subject, deckType }: LessonRequest) {
   const base = `${topic.trim().toLowerCase().replace(/\s+/g, " ")}|${grade}|${language}`;
-  const key = subject === "physics" ? base : `${base}|${subject}`;
+  // Добавки — только не по умолчанию, чтобы прежние уроки находились по старому id
+  const withSubject = subject === "physics" ? base : `${base}|${subject}`;
+  const key = deckType === "lesson" ? withSubject : `${withSubject}|${deckType}`;
   return createHash("sha1").update(key).digest("hex").slice(0, 12);
 }
+
+/** id пустого проекта — случайный: пустые заготовки не кэшируем, каждая своя */
+export const newLessonId = () => randomBytes(6).toString("hex");
 
 // Проверка формата id защищает от путей вроде "../../secret"
 const isValidId = (id: string) => /^[a-f0-9]{12}$/.test(id);

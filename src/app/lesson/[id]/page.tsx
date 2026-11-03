@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getLesson } from "@/lib/storage/lessons";
 import { games, type GameId } from "@/games/registry";
 import { LessonWorkspace } from "@/components/lesson/LessonWorkspace";
+import { hasAiKey } from "@/lib/ai/gemini";
 
 // ?tab=slides|games — что открыть, ?view=1 — только просмотр (из истории),
 // ?game=quiz — какую игру показать сразу
@@ -18,6 +19,7 @@ export default async function LessonPage({ params, searchParams }: PageProps<"/l
       tab={tab === "games" || gameId ? "games" : "slides"}
       readOnly={view === "1"}
       game={gameId}
+      aiEnabled={hasAiKey()}
     />
   );
 }

@@ -1,5 +1,6 @@
 import { apiError } from "@/lib/api-errors";
 import { joinSchema } from "@/types/room";
+import { shuffleFor } from "@/lib/rooms";
 import { addPlayer, getRoom } from "@/lib/storage/rooms";
 
 // POST /api/rooms/:code/players — ученик вводит имя и входит в игру
@@ -12,6 +13,6 @@ export async function POST(request: Request, ctx: RouteContext<"/api/rooms/[code
   const parsed = joinSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return apiError("nameRequired", 400);
 
-  const player = await addPlayer(code, parsed.data.name);
+  const player = await addPlayer(code, parsed.data.name, shuffleFor(room));
   return Response.json({ playerId: player.id });
 }
