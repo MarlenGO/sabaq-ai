@@ -32,8 +32,11 @@ export type SlideElement =
   | (Box & { type: "rect"; fill: ColorRole; rounded?: boolean | "full" })
   | (Box & { type: "circle"; color: string; transparency: number })
   | (Box & { type: "icon"; name: IconName; color: ColorRole })
-  /** Место под картинку: в PowerPoint учитель нажимает на значок и выбирает фото */
-  | (Box & { type: "image"; label: string; prompt: string })
+  /**
+   * Картинка. С src — настоящее фото (из Wikimedia, с подписью автора credit).
+   * Без src — место под картинку: в PowerPoint учитель нажимает на значок и выбирает фото.
+   */
+  | (Box & { type: "image"; label: string; prompt: string; src?: string; credit?: string })
   | (Box & {
       type: "text";
       /** Один абзац или несколько (массив) */
@@ -133,8 +136,8 @@ function badge(x: number, y: number, size: number, name: IconName, fill: ColorRo
   ];
 }
 
-function image(box: Box, l: Copy): SlideElement {
-  return { type: "image", ...box, label: l.image.label, prompt: l.image.prompt };
+function image(box: Box, l: Copy, picture?: { url: string; credit?: string }): SlideElement {
+  return { type: "image", ...box, label: l.image.label, prompt: l.image.prompt, src: picture?.url, credit: picture?.credit };
 }
 
 type Copy = (typeof copy)[Language];
@@ -300,7 +303,7 @@ function dataPages(spec: DataSlide, pkg: TopicPackage, l: Copy): Pages {
           heading(d.title, 44),
           { type: "rect", x: 6, y: 23, w: 8, h: 1.2, fill: "accent" },
           text({ x: 6, y: 30, w: 42, h: 58 }, d.bullets, 22, 12, { bullet: true, color: "muted" }),
-          image({ x: 53, y: 9, w: 41, h: 82 }, l),
+          image({ x: 53, y: 9, w: 41, h: 82 }, l, d.image),
         ],
         false,
       );
@@ -311,7 +314,7 @@ function dataPages(spec: DataSlide, pkg: TopicPackage, l: Copy): Pages {
       return one(
         d.caption,
         [
-          image({ x: 6, y: 8, w: 88, h: 68 }, l),
+          image({ x: 6, y: 8, w: 88, h: 68 }, l, d.image),
           { type: "rect", x: 6, y: 79, w: 88, h: 13, fill: "accent", rounded: true },
           text({ x: 9, y: 79, w: 82, h: 13 }, d.caption, 20, 12, { color: "onAccent", valign: "middle", bold: true }),
         ],

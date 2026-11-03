@@ -7,8 +7,8 @@ import { listPlayers, listRooms } from "@/lib/storage/rooms";
 // История собирается из трёх источников: уроки (когда созданы),
 // комнаты QR-игр (кто играл и как) и журнал (PPTX, игры на экране).
 // Новые события — сверху.
-export async function buildHistory(): Promise<HistoryEntry[]> {
-  const [lessons, rooms, activity] = await Promise.all([listLessons(), listRooms(), listActivity()]);
+export async function buildHistory(userId: string): Promise<HistoryEntry[]> {
+  const [lessons, rooms, activity] = await Promise.all([listLessons(userId), listRooms(userId), listActivity(userId)]);
   const byId = new Map(lessons.map((l) => [l.id, l]));
   const entries: HistoryEntry[] = [];
 

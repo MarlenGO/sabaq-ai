@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { topicPackageSchema, type TopicPackage } from "@/types/topic-package";
 import type { GameId } from "@/games/registry";
 import { useT } from "@/i18n/client";
 import { getTemplate } from "@/slides/templates";
 import { Card } from "@/components/ui/Card";
 import { ArrowLeftIcon, CheckIcon, EyeIcon, GameIcon, PencilIcon, SlidesIcon } from "@/components/ui/Icons";
-import { buttonClass } from "@/components/ui/Button";
+import { Button, buttonClass } from "@/components/ui/Button";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SlideEditor } from "@/components/slides/SlideEditor";
 import { SlidePreview } from "@/components/slides/SlidePreview";
@@ -28,8 +29,10 @@ interface LessonWorkspaceProps {
   initial: TopicPackage;
   /** Что учитель выбрал на главной: презентацию или игру. Показываем только это. */
   tab: Tab;
-  /** Только просмотр (открыто из истории): без конструктора и настроек */
+  /** Только просмотр (открыто из истории или чужой урок): без конструктора и настроек */
   readOnly: boolean;
+  /** Чужой урок из библиотеки: вместо «Өзгерту» — «Көшіріп алу» */
+  copyable?: boolean;
   /** Какую игру открыть сразу (из истории) */
   game?: GameId;
   /** Есть ли ключ AI — тогда в конструкторе видны кнопки «AI» */
@@ -39,7 +42,7 @@ interface LessonWorkspaceProps {
 // Рабочее место урока: презентация или игры (что выбрано на главной) и переключатель
 // «Конструктор / Алдын ала көру». Правки сохраняются на сервер сами
 // через секунду после последнего изменения.
-export function LessonWorkspace({ initial, tab, readOnly, game, aiEnabled }: LessonWorkspaceProps) {
+export function LessonWorkspace({ initial, tab, readOnly, copyable, game, aiEnabled }: LessonWorkspaceProps) {
   const [lesson, setLesson] = useState(initial);
   const t = useT();
   const [editMode, setMode] = useState<Mode>("preview");
@@ -90,7 +93,9 @@ export function LessonWorkspace({ initial, tab, readOnly, game, aiEnabled }: Les
             {t.subjects[lesson.subject]} · {t.common.grade(lesson.grade)} · {t.languages[lesson.language]}
           </p>
         </div>
-        {readOnly ? (
+        {copyable ? (
+          <CopyButton lessonId={lesson.id} tab={tab} />
+        ) : readOnly ? (
           <Link href={`${base}?tab=${tab}`} className={buttonClass("tinted", "lg")}>
             <PencilIcon />
             {t.lesson.editButton}
@@ -194,6 +199,30 @@ export function LessonWorkspace({ initial, tab, readOnly, game, aiEnabled }: Les
         </div>
       </AiProvider>
     </main>
+  );
+}
+
+// Урок из библиотеки → своя копия, и сразу открываем её для правки
+function CopyButton({ lessonId, tab }: { lessonId: string; tab: Tab }) {
+  const t = useT();
+  const router = useRouter();
+  const [busy, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const copy = () =>
+    startTransition(async () => {
+      const response = await fetch(`/api/lessons/${lessonId}/copy`, { method: "POST" }).catch(() => null);
+      const data = await response?.json().catch(() => null);
+      if (response?.ok && data?.id) router.push(`/lesson/${data.id}?tab=${tab}`);
+      else setError(data?.error ?? t.common.netError);
+    });
+  return (
+    <div className="flex flex-col items-start gap-1 sm:items-end">
+      <Button size="lg" variant="tinted" onClick={copy} disabled={busy}>
+        <PencilIcon />
+        {t.library.copy}
+      </Button>
+      {error && <p className="text-footnote text-red">{error}</p>}
+    </div>
   );
 }
 

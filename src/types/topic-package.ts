@@ -146,8 +146,8 @@ export const layoutSchemas = {
   goals: z.object({ title: line, items: z.array(z.object({ title: line, body: line })).length(3) }),
   plan: z.object({ title: line, steps: z.array(z.object({ name: line, time: line })).length(4) }),
   bullets: z.object({ title: line, lines }),
-  "text-image": z.object({ title: line, bullets: lines }),
-  "big-image": z.object({ caption: line }),
+  "text-image": z.object({ title: line, bullets: lines, image: imageSchema.optional() }),
+  "big-image": z.object({ caption: line, image: imageSchema.optional() }),
   compare: z.object({ title: line, left: line, right: line, leftLines: lines, rightLines: lines }),
   numbers: z.object({ title: line, items: z.array(z.object({ value: line, caption: line })).length(3) }),
   table: z.object({

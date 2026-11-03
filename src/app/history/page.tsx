@@ -4,6 +4,7 @@ import { buildHistory } from "@/lib/history";
 import { HistoryList } from "@/components/history/HistoryList";
 import { todayKeys } from "@/lib/dates";
 import { getT } from "@/i18n/server";
+import { requireUser } from "@/lib/auth";
 
 export default async function HistoryPage() {
   const t = await getT();
@@ -21,10 +22,11 @@ export default async function HistoryPage() {
   );
 }
 
-// Читает файлы при каждом открытии страницы (connection), поэтому внутри Suspense
+// Читает базу при каждом открытии страницы (connection), поэтому внутри Suspense
 async function History() {
   await connection();
-  const entries = await buildHistory();
+  const user = await requireUser();
+  const entries = await buildHistory(user.id);
   // «Бүгін» и «Кеше» считаем один раз здесь и передаём в браузер,
   // чтобы сервер и браузер подписали дни одинаково
   const { today, yesterday } = todayKeys();

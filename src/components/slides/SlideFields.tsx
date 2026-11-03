@@ -9,6 +9,7 @@ import { PlusIcon } from "@/components/ui/Icons";
 import { DeleteButton, MoveButtons } from "@/components/ui/ItemButtons";
 import { confirmDelete, fieldClass, moveItem, replaceAt } from "@/components/ui/field";
 import { useT } from "@/i18n/client";
+import { ImageField } from "@/components/games/ImageField";
 
 // Поля одного слайда в конструкторе. Слайды с содержанием темы (определение,
 // факты, примеры, термины) правят сам пакет темы, а заготовки — свои данные
@@ -234,17 +235,21 @@ function DeckFields({ spec, pkg, onChange }: { spec: DataSlide; pkg: TopicPackag
         <div className="flex flex-col gap-5">
           {heading(ti.title, (title) => save({ ...ti, title }))}
           {lines(t.deck.points, ti.bullets, (bullets) => save({ ...ti, bullets }))}
-          {imageNote}
+          <ImageField image={ti.image} query={pkg.examples[0]?.imageQuery ?? pkg.topic} onChange={(image) => save({ ...ti, image })} />
+          {!ti.image && imageNote}
         </div>
       );
     }
-    case "big-image":
+    case "big-image": {
+      const bi = slideData(pkg, spec);
       return (
         <div className="flex flex-col gap-5">
-          <TextField label={t.deck.caption} value={slideData(pkg, spec).caption} onChange={(caption) => save({ caption })} />
-          {imageNote}
+          <TextField label={t.deck.caption} value={bi.caption} onChange={(caption) => save({ ...bi, caption })} />
+          <ImageField image={bi.image} query={pkg.examples[1]?.imageQuery ?? pkg.topic} onChange={(image) => save({ ...bi, image })} />
+          {!bi.image && imageNote}
         </div>
       );
+    }
     case "compare": {
       const c = slideData(pkg, spec);
       return (

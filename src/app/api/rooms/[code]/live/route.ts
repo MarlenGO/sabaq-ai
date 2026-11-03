@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { apiError } from "@/lib/api-errors";
 import type { Room } from "@/types/room";
-import { updateRoom } from "@/lib/storage/rooms";
+import { currentUser } from "@/lib/auth";
+import { getRoomWithOwner, updateRoom } from "@/lib/storage/rooms";
 
 const actionSchema = z.object({ action: z.enum(["start", "reveal", "next"]) });
 
@@ -9,6 +10,11 @@ const actionSchema = z.object({ action: z.enum(["start", "reveal", "next"]) });
 // start — первый вопрос, reveal — показать ответ, next — следующий вопрос (или итоги)
 export async function POST(request: Request, ctx: RouteContext<"/api/rooms/[code]/live">) {
   const { code } = await ctx.params;
+  const user = await currentUser();
+  if (!user) return apiError("unauthorized", 401);
+  const found = await getRoomWithOwner(code);
+  if (!found) return apiError("roomNotFound", 404);
+  if (found.ownerId !== user.id && user.role !== "admin") return apiError("forbidden", 403);
   const parsed = actionSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return apiError("badRequest", 400);
   const { action } = parsed.data;

@@ -1,60 +1,83 @@
 import { randomBytes, randomInt } from "node:crypto";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { playerSchema, roomSchema, type Player, type Room } from "@/types/room";
+import { roomSchema, type Player, type Room } from "@/types/room";
+import { DbError, insert, isDuplicate, q, select, selectOne, update } from "@/lib/db";
 
-// Комнаты в файлах: data/rooms/<код>/room.json и players/<id>.json.
-// У каждого ученика свой файл, поэтому 30 человек, отвечающих одновременно,
-// не затирают ответы друг друга. Как и lessons.ts, при переходе на базу
-// данных заменяется только этот файл.
-
-const DIR = path.join(process.cwd(), "data", "rooms");
+// Игровые комнаты в базе: rooms (комната целиком в data), players (ученики)
+// и answers (ответ — отдельная строка). Уникальный ключ (ученик, вопрос)
+// в базе сам не даёт ответить дважды, даже если 30 человек жмут одновременно.
 
 const isCode = (code: string) => /^\d{6}$/.test(code);
 const isPlayerId = (id: string) => /^[a-f0-9]{16}$/.test(id);
-const roomDir = (code: string) => path.join(DIR, code);
-const roomFile = (code: string) => path.join(roomDir(code), "room.json");
-const playerFile = (code: string, id: string) => path.join(roomDir(code), "players", `${id}.json`);
 
-async function readJson(file: string): Promise<unknown> {
-  try {
-    return JSON.parse(await readFile(file, "utf8"));
-  } catch {
-    return null;
+interface RoomRow {
+  code: string;
+  owner_id: string | null;
+  data: unknown;
+}
+
+interface PlayerRow {
+  id: string;
+  name: string;
+  joined_at: string;
+  shuffle: Pick<Player, "order" | "optionOrders"> | null;
+  answers: { question: number; choice: number; correct: boolean; points: number }[];
+}
+
+const toRoom = (row: RoomRow | null) => {
+  const parsed = row && roomSchema.safeParse(row.data);
+  return parsed?.success ? parsed.data : null;
+};
+
+const toPlayer = (row: PlayerRow): Player => ({
+  id: row.id,
+  name: row.name,
+  joinedAt: row.joined_at,
+  answers: [...row.answers]
+    .sort((a, b) => a.question - b.question)
+    .map((a) => ({ index: a.question, choice: a.choice, correct: a.correct, points: a.points })),
+  ...(row.shuffle ?? {}),
+});
+
+const PLAYER_FIELDS = "id,name,joined_at,shuffle,answers(question,choice,correct,points)";
+
+export async function createRoom(data: Omit<Room, "code" | "status" | "createdAt">, ownerId: string): Promise<Room> {
+  // Код из 6 цифр; если вдруг занят — пробуем другой
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const code = String(randomInt(100000, 1000000));
+    const room: Room = { ...data, code, status: "open", createdAt: new Date().toISOString() };
+    try {
+      await insert("rooms", { code, owner_id: ownerId, lesson_id: data.lessonId, data: room, created_at: room.createdAt });
+      return room;
+    } catch (error) {
+      if (!isDuplicate(error)) throw error;
+    }
   }
-}
-
-// Ответы одного ученика пишутся по очереди: если он дважды быстро нажмёт,
-// второе сохранение дождётся первого и не потеряет его.
-const locks = new Map<string, Promise<unknown>>();
-function withLock<T>(key: string, task: () => Promise<T>): Promise<T> {
-  const previous = locks.get(key) ?? Promise.resolve();
-  const next = previous.catch(() => {}).then(task);
-  locks.set(key, next);
-  next.finally(() => locks.get(key) === next && locks.delete(key));
-  return next;
-}
-
-export async function createRoom(data: Omit<Room, "code" | "status" | "createdAt">): Promise<Room> {
-  await mkdir(DIR, { recursive: true });
-  const existing = new Set(await readdir(DIR).catch(() => [] as string[]));
-  let code = "";
-  do code = String(randomInt(100000, 1000000));
-  while (existing.has(code));
-
-  const room: Room = { ...data, code, status: "open", createdAt: new Date().toISOString() };
-  await mkdir(path.join(roomDir(code), "players"), { recursive: true });
-  await writeFile(roomFile(code), JSON.stringify(room, null, 2), "utf8");
-  return room;
+  throw new DbError(500, "No free room code");
 }
 
 export async function getRoom(code: string): Promise<Room | null> {
   if (!isCode(code)) return null;
-  const parsed = roomSchema.safeParse(await readJson(roomFile(code)));
-  return parsed.success ? parsed.data : null;
+  return toRoom(await selectOne<RoomRow>("rooms", `code=eq.${q(code)}`));
 }
 
-export async function finishRoom(code: string) {
+/** Комната и её учитель — для проверки, что управлять игрой может только он */
+export async function getRoomWithOwner(code: string) {
+  if (!isCode(code)) return null;
+  const row = await selectOne<RoomRow>("rooms", `code=eq.${q(code)}`);
+  const room = toRoom(row);
+  return room && row ? { room, ownerId: row.owner_id } : null;
+}
+
+/** Изменить комнату (ход «Жарыса», завершение). Меняет её только учитель — по одному действию за раз */
+export async function updateRoom(code: string, change: (room: Room) => Room | null) {
+  const room = await getRoom(code);
+  const updated = room && change(room);
+  if (!updated) return null;
+  await update("rooms", `code=eq.${q(code)}`, { data: updated });
+  return updated;
+}
+
+export function finishRoom(code: string) {
   return updateRoom(code, (room) => ({
     ...room,
     status: "finished",
@@ -62,56 +85,45 @@ export async function finishRoom(code: string) {
   }));
 }
 
-/** Изменить комнату (ход «Жарыса»): изменения идут по очереди, как ответы ученика */
-export function updateRoom(code: string, change: (room: Room) => Room | null) {
-  return withLock(`room/${code}`, async () => {
-    const room = await getRoom(code);
-    const updated = room && change(room);
-    if (!updated) return null;
-    await writeFile(roomFile(code), JSON.stringify(updated, null, 2), "utf8");
-    return updated;
-  });
-}
-
 export async function addPlayer(code: string, name: string, extra: Pick<Player, "order" | "optionOrders"> = {}): Promise<Player> {
-  const player: Player = {
-    id: randomBytes(8).toString("hex"),
-    name,
-    joinedAt: new Date().toISOString(),
-    answers: [],
-    ...extra,
-  };
-  await writeFile(playerFile(code, player.id), JSON.stringify(player), "utf8");
-  return player;
+  const id = randomBytes(8).toString("hex");
+  const shuffle = extra.order ? extra : null;
+  const [row] = await insert<Omit<PlayerRow, "answers">>("players", { id, room_code: code, name, shuffle });
+  return toPlayer({ ...row, answers: [] });
 }
 
 export async function getPlayer(code: string, id: string): Promise<Player | null> {
   if (!isCode(code) || !isPlayerId(id)) return null;
-  const parsed = playerSchema.safeParse(await readJson(playerFile(code, id)));
-  return parsed.success ? parsed.data : null;
+  const row = await selectOne<PlayerRow>("players", `id=eq.${q(id)}&room_code=eq.${q(code)}&select=${PLAYER_FIELDS}`);
+  return row ? toPlayer(row) : null;
 }
 
 export async function listPlayers(code: string): Promise<Player[]> {
   if (!isCode(code)) return [];
-  const files = await readdir(path.join(roomDir(code), "players")).catch(() => [] as string[]);
-  const players = await Promise.all(files.map((f) => getPlayer(code, f.replace(/\.json$/, ""))));
-  return players.filter((p): p is Player => p !== null);
+  const rows = await select<PlayerRow>("players", `room_code=eq.${q(code)}&select=${PLAYER_FIELDS}&order=joined_at`);
+  return rows.map(toPlayer);
 }
 
-/** Все комнаты (для истории) */
-export async function listRooms(): Promise<Room[]> {
-  const codes = await readdir(DIR).catch(() => [] as string[]);
-  const rooms = await Promise.all(codes.map((code) => getRoom(code)));
-  return rooms.filter((r): r is Room => r !== null);
+/** Комнаты учителя (для истории), новые — первыми */
+export async function listRooms(ownerId: string): Promise<Room[]> {
+  const rows = await select<RoomRow>("rooms", `owner_id=eq.${q(ownerId)}&order=created_at.desc&limit=200`);
+  return rows.map(toRoom).filter((r): r is Room => r !== null);
 }
 
 /** Записать ответ; null — если на этот вопрос ученик уже отвечал */
-export function saveAnswer(code: string, playerId: string, answer: Player["answers"][number]) {
-  return withLock(`${code}/${playerId}`, async () => {
-    const player = await getPlayer(code, playerId);
-    if (!player || player.answers.some((a) => a.index === answer.index)) return null;
-    const updated = { ...player, answers: [...player.answers, answer] };
-    await writeFile(playerFile(code, playerId), JSON.stringify(updated), "utf8");
-    return updated;
-  });
+export async function saveAnswer(code: string, playerId: string, answer: Player["answers"][number]) {
+  try {
+    await insert("answers", {
+      player_id: playerId,
+      room_code: code,
+      question: answer.index,
+      choice: answer.choice,
+      correct: answer.correct,
+      points: answer.points,
+    });
+    return true;
+  } catch (error) {
+    if (isDuplicate(error)) return null;
+    throw error;
+  }
 }

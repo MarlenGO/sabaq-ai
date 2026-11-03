@@ -1,19 +1,26 @@
 import { apiError } from "@/lib/api-errors";
+import { currentUser } from "@/lib/auth";
 import { topicPackageSchema } from "@/types/topic-package";
-import { getLesson, saveLesson } from "@/lib/storage/lessons";
+import { canWrite, getLessonFor, saveLesson } from "@/lib/storage/lessons";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/lessons/[id]">) {
+  const user = await currentUser();
+  if (!user) return apiError("unauthorized", 401);
   const { id } = await ctx.params;
-  const lesson = await getLesson(id);
-  if (!lesson) return apiError("lessonNotFound", 404);
-  return Response.json(lesson);
+  const record = await getLessonFor(user, id);
+  if (!record) return apiError("lessonNotFound", 404);
+  return Response.json(record.lesson);
 }
 
 // PUT /api/lessons/:id — сохранить правки из конструктора
 export async function PUT(request: Request, ctx: RouteContext<"/api/lessons/[id]">) {
+  const user = await currentUser();
+  if (!user) return apiError("unauthorized", 401);
   const { id } = await ctx.params;
-  const existing = await getLesson(id);
-  if (!existing) return apiError("lessonNotFound", 404);
+  const record = await getLessonFor(user, id);
+  if (!record) return apiError("lessonNotFound", 404);
+  if (!canWrite(user, record)) return apiError("forbidden", 403);
+  const existing = record.lesson;
 
   const parsed = topicPackageSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {

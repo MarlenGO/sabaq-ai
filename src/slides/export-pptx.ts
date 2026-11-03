@@ -48,6 +48,27 @@ function draw(pptx: PptxGenJS, slide: Slide, el: SlideElement, template: SlideTe
     return;
   }
 
+  // Настоящее фото: обрезаем по рамке (cover) и подписываем автора — так просит лицензия Wikimedia.
+  // Размеры для sizing pptxgenjs принимает в дюймах (слайд 10 × 5,625).
+  if (el.type === "image" && el.src) {
+    const inch = { x: (el.x / 100) * 10, y: (el.y / 100) * 5.625, w: (el.w / 100) * 10, h: (el.h / 100) * 5.625 };
+    slide.addImage({ path: el.src, ...inch, sizing: { type: "cover", w: inch.w, h: inch.h } });
+    if (el.credit) {
+      slide.addText(el.credit, {
+        x: inch.x,
+        y: inch.y + inch.h - 0.22,
+        w: inch.w,
+        h: 0.22,
+        fontSize: 7,
+        color: "FFFFFF",
+        fill: { color: "000000", transparency: 50 },
+        align: "right",
+        margin: 2,
+      });
+    }
+    return;
+  }
+
   // Место под картинку — заглушка из макета слайда (см. buildPptx), здесь рисовать нечего
   if (el.type === "image") return;
 
@@ -107,7 +128,10 @@ export async function buildPptx(
   }
 
   slides.forEach((spec, index) => {
-    const images = spec.elements.filter((el) => el.type === "image");
+    // Заглушки нужны только там, где фото ещё не выбрано
+    const images = spec.elements.filter(
+      (el): el is Extract<SlideElement, { type: "image" }> => el.type === "image" && !el.src,
+    );
     let slide: Slide;
     if (images.length > 0) {
       // Заглушку «вставить рисунок» PowerPoint умеет только через макет слайда,

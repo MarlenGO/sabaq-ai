@@ -1,28 +1,17 @@
-import { appendFile, mkdir, readFile } from "node:fs/promises";
-import path from "node:path";
 import { activitySchema, type Activity } from "@/types/history";
+import { insert, q, select } from "@/lib/db";
 
-// Журнал событий в одном файле data/activity.jsonl: одна строка — одно событие.
-// Строки только дописываются в конец, поэтому одновременные записи не мешают
-// друг другу. В базе данных это станет таблицей activity.
+// Журнал событий учителя (таблица activity): скачанный PPTX, игра на экране.
+// Строки только добавляются — одновременные записи не мешают друг другу.
 
-const DIR = path.join(process.cwd(), "data");
-const FILE = path.join(DIR, "activity.jsonl");
-
-export async function appendActivity(entry: Activity) {
-  await mkdir(DIR, { recursive: true });
-  await appendFile(FILE, JSON.stringify(entry) + "\n", "utf8");
+export async function appendActivity(userId: string, entry: Activity) {
+  await insert("activity", { user_id: userId, data: entry, at: entry.at });
 }
 
-export async function listActivity(): Promise<Activity[]> {
-  const text = await readFile(FILE, "utf8").catch(() => "");
-  return text.split("\n").flatMap((line) => {
-    if (!line.trim()) return [];
-    try {
-      const parsed = activitySchema.safeParse(JSON.parse(line));
-      return parsed.success ? [parsed.data] : [];
-    } catch {
-      return [];
-    }
+export async function listActivity(userId: string): Promise<Activity[]> {
+  const rows = await select<{ data: unknown }>("activity", `user_id=eq.${q(userId)}&select=data&order=at.desc&limit=500`);
+  return rows.flatMap((row) => {
+    const parsed = activitySchema.safeParse(row.data);
+    return parsed.success ? [parsed.data] : [];
   });
 }

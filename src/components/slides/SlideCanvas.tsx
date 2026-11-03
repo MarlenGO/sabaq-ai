@@ -32,6 +32,35 @@ function Element({ el, template }: { el: SlideElement; template: SlideTemplate }
     return <img src={iconDataUrl(el.name, template.colors[el.color])} alt="" style={boxStyle(el)} />;
   }
 
+  if (el.type === "image" && el.src) {
+    return (
+      <div style={{ ...boxStyle(el), borderRadius: pt(10), overflow: "hidden", background: hex(template.colors.surface) }}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- внешняя картинка Wikimedia, как RemoteImage */}
+        <img src={el.src} alt="" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        {el.credit && (
+          <span
+            style={{
+              position: "absolute",
+              right: 0,
+              bottom: 0,
+              maxWidth: "100%",
+              padding: `${pt(1)} ${pt(4)}`,
+              background: "rgba(0,0,0,0.45)",
+              color: "#fff",
+              fontSize: pt(6),
+              fontFamily: template.fonts.body,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {el.credit}
+          </span>
+        )}
+      </div>
+    );
+  }
+
   if (el.type === "image") {
     // В превью — пунктирная рамка-подсказка. В PPTX на этом месте будет
     // заглушка PowerPoint «нажмите на значок, чтобы вставить рисунок».

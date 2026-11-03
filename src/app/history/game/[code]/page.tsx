@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { questionStats, sortResults, toResult } from "@/lib/rooms";
-import { getRoom, listPlayers } from "@/lib/storage/rooms";
+import { getRoomWithOwner, listPlayers } from "@/lib/storage/rooms";
+import { requireUser } from "@/lib/auth";
 import { Card } from "@/components/ui/Card";
 import { ArrowLeftIcon } from "@/components/ui/Icons";
 import { CsvButton, QuestionStats, ResultsTable } from "@/components/games/ResultsTable";
@@ -11,8 +12,11 @@ import { getT } from "@/i18n/server";
 // Результаты прошедшей QR-игры: можно снова посмотреть таблицу и скачать её в Excel
 export default async function PastGamePage({ params }: PageProps<"/history/game/[code]">) {
   const { code } = await params;
-  const room = await getRoom(code);
-  if (!room) notFound();
+  const user = await requireUser();
+  const found = await getRoomWithOwner(code);
+  // Чужие результаты не показываем (админу — можно)
+  if (!found || (found.ownerId !== user.id && user.role !== "admin")) notFound();
+  const room = found.room;
   const t = await getT();
 
   const players = await listPlayers(code);
