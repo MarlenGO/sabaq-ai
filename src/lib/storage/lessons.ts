@@ -12,10 +12,12 @@ import { topicPackageSchema, type LessonRequest, type TopicPackage } from "@/typ
 
 const DIR = path.join(process.cwd(), "data", "lessons");
 
-// id — короткий хэш от «тема + класс + язык». Одинаковый запрос даёт
+// id — короткий хэш от «тема + класс + язык + предмет». Одинаковый запрос даёт
 // тот же id, поэтому повторная генерация не нужна: это и есть кэш тем.
-export function lessonId({ topic, grade, language }: LessonRequest) {
-  const key = `${topic.trim().toLowerCase().replace(/\s+/g, " ")}|${grade}|${language}`;
+// Физика — без добавки, чтобы уроки, созданные до выбора предмета, находились по-прежнему.
+export function lessonId({ topic, grade, language, subject }: LessonRequest) {
+  const base = `${topic.trim().toLowerCase().replace(/\s+/g, " ")}|${grade}|${language}`;
+  const key = subject === "physics" ? base : `${base}|${subject}`;
   return createHash("sha1").update(key).digest("hex").slice(0, 12);
 }
 
@@ -39,14 +41,27 @@ export async function saveLesson(lesson: TopicPackage) {
   await writeFile(fileOf(lesson.id), JSON.stringify(lesson, null, 2), "utf8");
 }
 
-export type LessonSummary = Pick<TopicPackage, "id" | "topic" | "grade" | "language" | "subject" | "updatedAt">;
+export type LessonSummary = Pick<
+  TopicPackage,
+  "id" | "topic" | "grade" | "language" | "subject" | "source" | "createdAt" | "updatedAt"
+>;
 
-export async function listLessons(limit = 6): Promise<LessonSummary[]> {
+/** Уроки, недавно изменённые — первыми. Без limit — все. */
+export async function listLessons(limit = Infinity): Promise<LessonSummary[]> {
   const files = await readdir(DIR).catch(() => [] as string[]);
   const lessons = await Promise.all(files.filter((f) => f.endsWith(".json")).map((f) => getLesson(f.slice(0, -5))));
   return lessons
     .filter((l): l is TopicPackage => l !== null)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, limit)
-    .map(({ id, topic, grade, language, subject, updatedAt }) => ({ id, topic, grade, language, subject, updatedAt }));
+    .map(({ id, topic, grade, language, subject, source, createdAt, updatedAt }) => ({
+      id,
+      topic,
+      grade,
+      language,
+      subject,
+      source,
+      createdAt,
+      updatedAt,
+    }));
 }

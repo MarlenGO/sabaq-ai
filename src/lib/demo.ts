@@ -5,8 +5,8 @@ import { newtonFirstLaw7 } from "@/data/mock-packages/newton-first-law-7";
 // мокового пакета. Тема в заголовке будет та, что ввёл учитель, а содержание —
 // пример про закон Ньютона. Страница урока честно предупреждает об этом.
 export function demoContent(): PackageContent {
-  const { subject, definition, formula, keyFacts, examples, terms, quiz, trueFalse } = newtonFirstLaw7;
-  return { subject, definition, formula, keyFacts, examples, terms, quiz, trueFalse };
+  const { definition, formula, keyFacts, examples, terms, quiz, trueFalse } = newtonFirstLaw7;
+  return { definition, formula, keyFacts, examples, terms, quiz, trueFalse };
 }
 
 // «Своя игра» из того, что уже есть в пакете. Используется в демо-режиме

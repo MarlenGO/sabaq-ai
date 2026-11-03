@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/Card";
 import { CheckIcon, XIcon } from "@/components/ui/Icons";
 import { RemoteImage } from "@/components/ui/RemoteImage";
 import { fieldClass } from "@/components/ui/field";
+import { useT } from "@/i18n/client";
 
 // Игра на телефоне ученика: ввести имя и ответить на вопросы в своём темпе.
 // id ученика хранится в браузере, поэтому после обновления страницы
@@ -56,12 +57,13 @@ export function StudentGame({ code }: { code: string }) {
   const [name, setName] = useState("");
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [joining, setJoining] = useState(false);
+  const t = useT();
 
   useEffect(() => {
     let active = true;
     loadRoom(code).then((data) => {
       if (!active) return;
-      if (!data?.room) return setError(data?.error ?? "Байланыс үзілді. Бетті жаңартыңыз.");
+      if (!data?.room) return setError(data?.error ?? t.play.reload);
       setRoom(data.room);
       if (data.player) {
         setPlayerId(data.player.id);
@@ -72,6 +74,8 @@ export function StudentGame({ code }: { code: string }) {
     return () => {
       active = false;
     };
+    // t не в зависимостях: комнату грузим один раз, язык меняется только с перезагрузкой
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
   if (error) {
@@ -79,7 +83,7 @@ export function StudentGame({ code }: { code: string }) {
       <Card className="p-6 text-center">
         <p className="text-body">{error}</p>
         <Link href="/play" className="mt-4 inline-block font-semibold text-accent">
-          Басқа код енгізу
+          {t.play.otherCode}
         </Link>
       </Card>
     );
@@ -95,7 +99,7 @@ export function StudentGame({ code }: { code: string }) {
     }).catch(() => null);
     const data = await response?.json().catch(() => null);
     setJoining(false);
-    if (!response?.ok || !data?.playerId) return setError(data?.error ?? "Кіру мүмкін болмады.");
+    if (!response?.ok || !data?.playerId) return setError(data?.error ?? t.play.joinError);
     try {
       localStorage.setItem(playerKey(code), data.playerId);
     } catch {}
@@ -103,11 +107,11 @@ export function StudentGame({ code }: { code: string }) {
   };
 
   if (!playerId) {
-    if (room.status === "finished") return <Card className="p-6 text-center text-body">Бұл ойын аяқталған.</Card>;
+    if (room.status === "finished") return <Card className="p-6 text-center text-body">{t.play.gameFinished}</Card>;
     return (
       <Card className="flex flex-col gap-4 p-6">
         <div>
-          <p className="text-footnote font-semibold uppercase tracking-wide text-label-2">Ойын · {code}</p>
+          <p className="text-footnote font-semibold uppercase tracking-wide text-label-2">{t.play.game} · {code}</p>
           <h1 className="mt-1 text-title1 font-bold">{room.title}</h1>
         </div>
         <form
@@ -118,18 +122,18 @@ export function StudentGame({ code }: { code: string }) {
           }}
         >
           <label className="flex flex-col gap-1.5">
-            <span className="text-subhead font-semibold">Атың мен тегің</span>
+            <span className="text-subhead font-semibold">{t.play.name}</span>
             <input
               className={`${fieldClass} h-14`}
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={30}
               autoComplete="name"
-              placeholder="Мысалы: Айгерім Сейітова"
+              placeholder={t.play.namePlaceholder}
             />
           </label>
           <Button type="submit" size="lg" disabled={!name.trim() || joining}>
-            {joining ? "Кіріп жатырмын…" : "Ойынға кіру"}
+            {joining ? t.play.joining : t.play.join}
           </Button>
         </form>
       </Card>
@@ -144,14 +148,14 @@ export function StudentGame({ code }: { code: string }) {
   if (next >= total || room.status === "finished") {
     return (
       <Card className="flex flex-col items-center gap-2 p-8 text-center">
-        <p className="text-title3 text-label-2">{name}, жарайсың!</p>
+        <p className="text-title3 text-label-2">{t.play.wellDone(name)}</p>
         <p className="text-display font-bold text-accent">
-          {room.game === "quiz" ? `${points} ұпай` : `Баға: ${schoolGrade(correct, total)}`}
+          {room.game === "quiz" ? t.common.points(points) : t.common.mark(schoolGrade(correct, total))}
         </p>
         <p className="text-body text-label-2">
-          {total} сұрақтың {correct}-іне дұрыс жауап бердің
+          {t.play.answeredOf(correct, total)}
         </p>
-        <p className="mt-3 text-subhead text-label-2">Нәтижең мұғалімнің экранында</p>
+        <p className="mt-3 text-subhead text-label-2">{t.play.onTeacherScreen}</p>
       </Card>
     );
   }
@@ -190,6 +194,7 @@ function QuestionCard(props: {
   const [timeLeft, setTimeLeft] = useState(QUIZ_SECONDS);
   const shownAt = useRef(0);
   const timed = game === "quiz";
+  const t = useT();
 
   const submit = useCallback(
     async (choice: number) => {
@@ -201,7 +206,7 @@ function QuestionCard(props: {
       }).catch(() => null);
       const data = await response?.json().catch(() => null);
       setSending(false);
-      if (response?.status === 409 && data?.error?.includes("аяқтады")) return props.onClosed();
+      if (data?.code === "teacherFinished") return props.onClosed();
       if (response?.ok) setFeedback({ choice, ...data });
     },
     [code, playerId, index, props],
@@ -236,7 +241,7 @@ function QuestionCard(props: {
             style={{ width: timed && !answered ? `${(timeLeft / QUIZ_SECONDS) * 100}%` : `${((index + 1) / total) * 100}%` }}
           />
         </div>
-        {timed && !answered && <span className="w-10 text-right text-subhead font-semibold tabular-nums">{timeLeft} с</span>}
+        {timed && !answered && <span className="w-10 text-right text-subhead font-semibold tabular-nums">{timeLeft} {t.common.seconds}</span>}
       </div>
 
       <Card className="flex flex-col gap-3 p-5">
@@ -276,16 +281,16 @@ function QuestionCard(props: {
         <Card className="flex flex-col gap-3 p-4">
           <p className="text-body">
             {feedback.choice === -1 ? (
-              <b className="text-orange">Уақыт бітті!</b>
+              <b className="text-orange">{t.common.timeUp}</b>
             ) : feedback.correct ? (
-              <b className="text-green">Дұрыс!{timed && ` +${feedback.points}`}</b>
+              <b className="text-green">{t.common.correct}{timed && ` +${feedback.points}`}</b>
             ) : (
-              <b className="text-red">Қате.</b>
+              <b className="text-red">{t.common.wrong}</b>
             )}{" "}
             {feedback.explanation && <span className="text-label-2">{feedback.explanation}</span>}
           </p>
           <Button size="lg" onClick={() => props.onDone({ index, correct: feedback.correct, points: feedback.points })}>
-            {index + 1 >= total ? "Нәтижемді көру" : "Келесі сұрақ"}
+            {index + 1 >= total ? t.play.seeMyResult : t.common.nextQuestion}
           </Button>
         </Card>
       )}

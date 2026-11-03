@@ -1,3 +1,4 @@
+import { apiError } from "@/lib/api-errors";
 import { z } from "zod";
 import { roomGameSchema } from "@/types/room";
 import { roomQuestions } from "@/lib/rooms";
@@ -9,13 +10,13 @@ const createSchema = z.object({ lessonId: z.string(), game: roomGameSchema });
 // POST /api/rooms — учитель запускает игру через QR
 export async function POST(request: Request) {
   const parsed = createSchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: "Ойын түрі дұрыс емес." }, { status: 400 });
+  if (!parsed.success) return apiError("badGame", 400);
 
   const lesson = await getLesson(parsed.data.lessonId);
-  if (!lesson) return Response.json({ error: "Сабақ табылмады." }, { status: 404 });
+  if (!lesson) return apiError("lessonNotFound", 404);
 
   const questions = roomQuestions(lesson, parsed.data.game);
-  if (questions.length === 0) return Response.json({ error: "Сұрақтар жоқ." }, { status: 400 });
+  if (questions.length === 0) return apiError("noQuestions", 400);
 
   const room = await createRoom({
     lessonId: lesson.id,

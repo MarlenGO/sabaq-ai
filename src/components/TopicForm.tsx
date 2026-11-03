@@ -1,8 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
-import type { Language } from "@/types/topic-package";
+import { useState, useTransition, type ReactNode } from "react";
+import type { Language, Subject } from "@/types/topic-package";
+import { subjectOrder } from "@/lib/labels";
+import { useT } from "@/i18n/client";
 import { useStoredState } from "@/lib/stored-state";
 import { useVoiceInput } from "@/lib/voice-input";
 import { Button } from "@/components/ui/Button";
@@ -16,10 +18,11 @@ interface Draft {
   topic: string;
   grade: number;
   language: Language;
+  subject: Subject;
   output: Output;
 }
 
-const emptyDraft: Draft = { topic: "", grade: 7, language: "kk", output: "slides" };
+const emptyDraft: Draft = { topic: "", grade: 7, language: "kk", subject: "physics", output: "slides" };
 
 const grades = Array.from({ length: 11 }, (_, i) => i + 1);
 
@@ -32,8 +35,13 @@ const exampleTopics: Record<Language, string[]> = {
 // Всё введённое сохраняется автоматически (см. useStoredState).
 export function TopicForm() {
   const router = useRouter();
+  const t = useT();
   const [draft, setDraft] = useStoredState("sabaq-draft", emptyDraft);
-  const [loading, setLoading] = useState(false);
+  // Переход на урок — «переход» (transition): кнопка крутится, пока идёт запрос
+  // и открывается урок, а потом сама возвращается в обычный вид. Раньше тут был
+  // флаг loading, и он «застревал»: Next.js сохраняет главную страницу целиком,
+  // когда уходишь на урок, и при возврате кнопка всё ещё крутилась.
+  const [loading, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const update = (patch: Partial<Draft>) => {
     setDraft({ ...draft, ...patch });
@@ -43,22 +51,22 @@ export function TopicForm() {
   const voice = useVoiceInput(draft.language, (text) => update({ topic: text }));
   const hasTopic = draft.topic.trim().length >= 2;
 
-  const submit = async () => {
-    setLoading(true);
-    setError(null);
-    const response = await fetch("/api/lessons", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic: draft.topic, grade: draft.grade, language: draft.language }),
-    }).catch(() => null);
-    const data = await response?.json().catch(() => null);
-    if (response?.ok && data?.id) {
-      router.push(`/lesson/${data.id}?tab=${draft.output === "slides" ? "slides" : "games"}`);
-      return; // кнопка остаётся в состоянии «жасап жатырмын», пока открывается урок
-    }
-    setLoading(false);
-    setError(data?.error ?? "Байланыс үзілді. Интернетті тексеріп, қайталап көріңіз.");
-  };
+  const submit = () =>
+    startTransition(async () => {
+      setError(null);
+      const { topic, grade, language, subject } = draft;
+      const response = await fetch("/api/lessons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, grade, language, subject }),
+      }).catch(() => null);
+      const data = await response?.json().catch(() => null);
+      if (response?.ok && data?.id) {
+        router.push(`/lesson/${data.id}?tab=${draft.output === "slides" ? "slides" : "games"}`);
+        return;
+      }
+      setError(data?.error ?? t.form.netError);
+    });
 
   return (
     <Card className="p-5 sm:p-8">
@@ -69,21 +77,21 @@ export function TopicForm() {
           if (!loading) submit();
         }}
       >
-        <Step n={1} title="Сабақтың тақырыбын жазыңыз">
+        <Step n={1} title={t.form.step1}>
           <div className="relative">
             <input
               value={draft.topic}
               onChange={(e) => update({ topic: e.target.value })}
               placeholder={exampleTopics[draft.language][0]}
-              aria-label="Сабақтың тақырыбы"
+              aria-label={t.form.topicLabel}
               className="h-14 w-full rounded-2xl bg-fill pl-5 pr-16 text-body outline-none placeholder:text-label-3 focus:ring-4 focus:ring-accent/25"
             />
             {voice.supported && (
               <button
                 type="button"
                 onClick={voice.listening ? voice.stop : voice.start}
-                aria-label={voice.listening ? "Тыңдауды тоқтату" : "Дауыспен айту"}
-                title="Дауыспен айту"
+                aria-label={voice.listening ? t.form.voiceStop : t.form.voiceStart}
+                title={t.form.voiceStart}
                 className={`absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-xl transition ${
                   voice.listening ? "animate-pulse bg-red text-white" : "text-accent hover:bg-accent/12"
                 }`}
@@ -92,10 +100,10 @@ export function TopicForm() {
               </button>
             )}
           </div>
-          {voice.listening && <p className="mt-2 text-subhead text-red">Тыңдап тұрмын… тақырыпты айтыңыз</p>}
+          {voice.listening && <p className="mt-2 text-subhead text-red">{t.form.listening}</p>}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-footnote text-label-2">Мысалы:</span>
+            <span className="text-footnote text-label-2">{t.form.examples}</span>
             {exampleTopics[draft.language].map((topic) => (
               <button
                 key={topic}
@@ -109,8 +117,30 @@ export function TopicForm() {
           </div>
         </Step>
 
-        <Step n={2} title="Сынып пен тілді таңдаңыз">
-          <div role="radiogroup" aria-label="Сынып" className="flex flex-wrap gap-2">
+        <Step n={2} title={t.form.step2}>
+          <div role="radiogroup" aria-label={t.form.subject} className="flex flex-wrap gap-2">
+            {subjectOrder.map((subject) => {
+              const selected = subject === draft.subject;
+              return (
+                <button
+                  key={subject}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => update({ subject })}
+                  className={`h-11 rounded-full px-4 text-callout font-semibold transition ${
+                    selected ? "bg-accent text-white shadow-sm" : "bg-fill text-label hover:bg-accent/15"
+                  }`}
+                >
+                  {t.subjects[subject]}
+                </button>
+              );
+            })}
+          </div>
+        </Step>
+
+        <Step n={3} title={t.form.step3}>
+          <div role="radiogroup" aria-label={t.form.gradeLabel} className="flex flex-wrap gap-2">
             {grades.map((grade) => {
               const selected = grade === draft.grade;
               return (
@@ -119,7 +149,7 @@ export function TopicForm() {
                   type="button"
                   role="radio"
                   aria-checked={selected}
-                  aria-label={`${grade}-сынып`}
+                  aria-label={t.common.grade(grade)}
                   onClick={() => update({ grade })}
                   className={`h-11 min-w-11 rounded-full px-3 text-callout font-semibold transition ${
                     selected ? "bg-accent text-white shadow-sm" : "bg-fill text-label hover:bg-accent/15"
@@ -133,7 +163,7 @@ export function TopicForm() {
           <div className="mt-4">
             <SegmentedControl
               size="lg"
-              ariaLabel="Тіл"
+              ariaLabel={t.form.contentLanguage}
               value={draft.language}
               onChange={(language) => update({ language })}
               options={[
@@ -144,23 +174,23 @@ export function TopicForm() {
           </div>
         </Step>
 
-        <Step n={3} title="Не жасаймыз?">
-          <div role="radiogroup" aria-label="Нәтиже" className="grid gap-3 sm:grid-cols-2">
+        <Step n={4} title={t.form.step4}>
+          <div role="radiogroup" aria-label={t.form.output} className="grid gap-3 sm:grid-cols-2">
             <OutputTile
               selected={draft.output === "slides"}
               onSelect={() => update({ output: "slides" })}
               icon={<SlidesIcon />}
               tint="bg-accent"
-              title="Презентация"
-              text="Дайын слайдтар, PowerPoint-ке жүктеуге болады"
+              title={t.form.slidesTitle}
+              text={t.form.slidesText}
             />
             <OutputTile
               selected={draft.output === "game"}
               onSelect={() => update({ output: "game" })}
               icon={<GameIcon />}
               tint="bg-purple"
-              title="Ойын"
-              text="Викторина, «жұбын тап» — оқушылар телефоннан ойнайды"
+              title={t.form.gameTitle}
+              text={t.form.gameText}
             />
           </div>
         </Step>
@@ -169,15 +199,15 @@ export function TopicForm() {
           <Button type="submit" size="lg" disabled={!hasTopic || loading} className="w-full">
             <SparkleIcon className={loading ? "animate-spin" : ""} />
             {loading
-              ? "Жасап жатырмын… 10–20 секунд"
+              ? t.form.working
               : draft.output === "slides"
-                ? "Дайын слайд жасау"
-                : "Дайын ойын жасау"}
+                ? t.form.makeSlides
+                : t.form.makeGame}
           </Button>
           <p className="text-center text-footnote text-label-2">
             {hasTopic
-              ? "Барлығы автоматты түрде сақталады — бетті жауып қойсаңыз да жоғалмайды"
-              : "Бастау үшін тақырыпты жазыңыз немесе мысалды басыңыз"}
+              ? t.form.autosaved
+              : t.form.startHint}
           </p>
           {error && (
             <div role="alert" className="rounded-2xl bg-red/10 p-4 text-subhead text-red">

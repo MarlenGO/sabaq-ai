@@ -1,3 +1,4 @@
+import { apiError } from "@/lib/api-errors";
 import { toPublicRoom } from "@/lib/rooms";
 import { getPlayer, getRoom } from "@/lib/storage/rooms";
 
@@ -7,7 +8,7 @@ import { getPlayer, getRoom } from "@/lib/storage/rooms";
 export async function GET(request: Request, ctx: RouteContext<"/api/rooms/[code]/play">) {
   const { code } = await ctx.params;
   const room = await getRoom(code);
-  if (!room) return Response.json({ error: "Ойын табылмады. Кодты тексеріңіз." }, { status: 404 });
+  if (!room) return apiError("roomNotFoundCode", 404);
 
   const playerId = new URL(request.url).searchParams.get("player");
   const player = playerId ? await getPlayer(code, playerId) : null;

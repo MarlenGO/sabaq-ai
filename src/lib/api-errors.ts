@@ -1,17 +1,28 @@
 import { AiError } from "@/lib/ai/gemini";
+import { getT } from "@/i18n/server";
+import type { Messages } from "@/i18n/kk";
+
+type ErrorKey = keyof Messages["errors"];
+
+// Ответ с ошибкой на языке сайта (cookie). code — для кода в браузере,
+// error — понятный текст, который показываем учителю или ученику.
+export async function apiError(code: ErrorKey, status: number, extra?: Record<string, unknown>) {
+  const t = await getT();
+  return Response.json({ error: t.errors[code], code, ...extra }, { status });
+}
 
 // Понятные учителю сообщения вместо технических ошибок
-export function errorResponse(error: unknown) {
+export async function errorResponse(error: unknown) {
   if (error instanceof AiError) {
-    const messages: Record<AiError["code"], [string, number]> = {
-      no_key: ["AI кілті қосылмаған.", 503],
-      rate_limit: ["Тегін сұраныстар уақытша бітті. Бір минуттан кейін қайталап көріңіз.", 429],
-      bad_response: ["AI дұрыс жауап бермеді. Қайталап көріңіз.", 502],
-      unavailable: ["AI қазір қолжетімсіз. Біраздан кейін қайталап көріңіз.", 503],
+    const map: Record<AiError["code"], [ErrorKey, number]> = {
+      no_key: ["noKey", 503],
+      rate_limit: ["rateLimit", 429],
+      bad_response: ["badResponse", 502],
+      unavailable: ["unavailable", 503],
     };
-    const [message, status] = messages[error.code];
-    return Response.json({ error: message }, { status });
+    const [code, status] = map[error.code];
+    return apiError(code, status);
   }
   console.error(error);
-  return Response.json({ error: "Белгісіз қате шықты. Қайталап көріңіз." }, { status: 500 });
+  return apiError("unknown", 500);
 }

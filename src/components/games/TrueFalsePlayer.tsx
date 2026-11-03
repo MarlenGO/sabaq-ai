@@ -6,23 +6,34 @@ import { schoolGrade } from "@/lib/labels";
 import { Button } from "@/components/ui/Button";
 import { CheckIcon, XIcon } from "@/components/ui/Icons";
 import { EmptyGame } from "./GameStage";
+import { useT } from "@/i18n/client";
 
-export function TrueFalsePlayer({ items, language }: { items: TrueFalseStatement[]; language: Language }) {
+export function TrueFalsePlayer({
+  items,
+  language,
+  onFirstAnswer,
+}: {
+  items: TrueFalseStatement[];
+  language: Language;
+  onFirstAnswer?: () => void;
+}) {
   const [index, setIndex] = useState(0);
   const [answer, setAnswer] = useState<boolean | null>(null);
   const [correct, setCorrect] = useState(0);
   const [finished, setFinished] = useState(false);
+  const t = useT();
+  // Кнопки — на языке урока: их видит класс
   const [yes, no] = language === "kk" ? ["Шын", "Жалған"] : ["Правда", "Ложь"];
 
-  if (items.length === 0) return <EmptyGame text="Тұжырымдар жоқ. «Конструктор» бөлімінде қосыңыз." />;
+  if (items.length === 0) return <EmptyGame text={t.games_ui.noStatements} />;
 
   if (finished) {
     return (
       <div className="flex flex-col items-center gap-3 py-10 text-center">
-        <p className="text-title3 text-label-2">Ойын аяқталды!</p>
-        <p className="text-display font-bold text-accent">Баға: {schoolGrade(correct, items.length)}</p>
+        <p className="text-title3 text-label-2">{t.common.gameOver}</p>
+        <p className="text-display font-bold text-accent">{t.common.mark(schoolGrade(correct, items.length))}</p>
         <p className="text-body text-label-2">
-          {items.length} тұжырымның {correct}-і дұрыс
+          {t.games_ui.statementsOf(correct, items.length)}
         </p>
         <Button
           size="lg"
@@ -34,7 +45,7 @@ export function TrueFalsePlayer({ items, language }: { items: TrueFalseStatement
             setFinished(false);
           }}
         >
-          Қайта бастау
+          {t.common.restart}
         </Button>
       </div>
     );
@@ -53,6 +64,7 @@ export function TrueFalsePlayer({ items, language }: { items: TrueFalseStatement
 
   const choose = (value: boolean) => {
     if (revealed) return;
+    onFirstAnswer?.();
     setAnswer(value);
     if (value === item.isTrue) setCorrect((c) => c + 1);
   };
@@ -86,11 +98,11 @@ export function TrueFalsePlayer({ items, language }: { items: TrueFalseStatement
       {revealed && (
         <div className="flex flex-col items-center gap-3">
           <p className="text-body">
-            <span className={`font-semibold ${right ? "text-green" : "text-red"}`}>{right ? "Дұрыс!" : "Қате."}</span>{" "}
+            <span className={`font-semibold ${right ? "text-green" : "text-red"}`}>{right ? t.common.correct : t.common.wrong}</span>{" "}
             {item.explanation && <span className="text-label-2">{item.explanation}</span>}
           </p>
           <Button size="lg" onClick={next}>
-            {isLast ? "Нәтижені көру" : "Келесі"}
+            {isLast ? t.common.seeResult : t.common.next}
           </Button>
         </div>
       )}

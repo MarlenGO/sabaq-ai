@@ -5,6 +5,7 @@ import type { QuestionImage } from "@/types/topic-package";
 import { Button } from "@/components/ui/Button";
 import { RemoteImage } from "@/components/ui/RemoteImage";
 import { ImagePicker } from "./ImagePicker";
+import { useT } from "@/i18n/client";
 
 // Картинка к вопросу в конструкторе: «Сурет қосу» или превью с «Ауыстыру / Өшіру».
 // compact — маленькая кнопка для строк «Өз ойын».
@@ -21,6 +22,7 @@ export function ImageField({
   compact?: boolean;
 }) {
   const [picking, setPicking] = useState(false);
+  const t = useT();
 
   const picker = picking && (
     <ImagePicker
@@ -39,8 +41,8 @@ export function ImageField({
         <button
           type="button"
           onClick={() => setPicking(true)}
-          title={image ? "Суретті ауыстыру" : "Сурет қосу"}
-          aria-label={image ? "Суретті ауыстыру" : "Сурет қосу"}
+          title={image ? t.image.replace : t.image.add}
+          aria-label={image ? t.image.replace : t.image.add}
           className="mt-1 flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-fill text-accent transition hover:ring-2 hover:ring-accent/40"
         >
           {image ? (
@@ -62,17 +64,17 @@ export function ImageField({
           <RemoteImage image={image} className="max-h-32" showCredit={false} />
           <div className="flex gap-2">
             <Button variant="tinted" onClick={() => setPicking(true)}>
-              Ауыстыру
+              {t.image.replaceShort}
             </Button>
             <Button variant="plain" className="text-red" onClick={() => onChange(undefined)}>
-              Суретті алып тастау
+              {t.image.remove}
             </Button>
           </div>
         </>
       ) : (
         <Button variant="tinted" onClick={() => setPicking(true)}>
           <PhotoIcon />
-          Сурет қосу
+          {t.image.add}
         </Button>
       )}
       {picker}

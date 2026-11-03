@@ -8,6 +8,7 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { XIcon } from "@/components/ui/Icons";
 import { RemoteImage } from "@/components/ui/RemoteImage";
 import { fieldClass } from "@/components/ui/field";
+import { useT } from "@/i18n/client";
 
 // Окно выбора картинки к вопросу: поиск в Wikimedia Commons
 // или ссылка на картинку из интернета. Сохраняется только ссылка.
@@ -28,6 +29,7 @@ export function ImagePicker({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState("");
+  const t = useT();
 
   // Окно открывается сразу при появлении компонента
   useEffect(() => {
@@ -42,7 +44,7 @@ export function ImagePicker({
     const data = await response?.json().catch(() => null);
     setLoading(false);
     if (response?.ok) setResults(data.results);
-    else setError(data?.error ?? "Іздеу мүмкін болмады.");
+    else setError(data?.error ?? t.image.searchError);
   };
 
   const linkImage = imageSchema.safeParse({ url: link.trim() });
@@ -57,18 +59,18 @@ export function ImagePicker({
         <div className="flex items-center justify-between gap-3 border-b border-separator p-4">
           <SegmentedControl
             size="lg"
-            ariaLabel="Сурет қайдан"
+            ariaLabel={t.image.source}
             value={tab}
             onChange={setTab}
             options={[
-              { value: "search", label: "Іздеу" },
-              { value: "link", label: "Сілтеме қою" },
+              { value: "search", label: t.image.search },
+              { value: "link", label: t.image.link },
             ]}
           />
           <button
             type="button"
             onClick={() => dialog.current?.close()}
-            aria-label="Жабу"
+            aria-label={t.common.close}
             className="flex h-11 w-11 items-center justify-center rounded-full bg-fill text-label-2 hover:text-label"
           >
             <XIcon />
@@ -88,22 +90,22 @@ export function ImagePicker({
                 className={fieldClass}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Не іздейміз? Мысалы: Абай, жасуша, жанартау"
-                aria-label="Сурет іздеу"
+                placeholder={t.image.searchPlaceholder}
+                aria-label={t.image.searchLabel}
                 autoFocus
               />
               <Button type="submit" size="lg" disabled={loading || !query.trim()}>
-                {loading ? "…" : "Іздеу"}
+                {loading ? "…" : t.image.search}
               </Button>
             </form>
             {error && <p className="text-subhead text-red">{error}</p>}
             <div className="min-h-0 flex-1 overflow-y-auto">
               {results === null ? (
                 <p className="py-10 text-center text-subhead text-label-2">
-                  Сөзді жазып, «Іздеу» батырмасын басыңыз. Суреттер Wikimedia Commons тегін кітапханасынан алынады.
+                  {t.image.searchHint}
                 </p>
               ) : results.length === 0 ? (
-                <p className="py-10 text-center text-subhead text-label-2">Ештеңе табылмады. Басқа сөзбен іздеп көріңіз.</p>
+                <p className="py-10 text-center text-subhead text-label-2">{t.image.nothing}</p>
               ) : (
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {results.map((r) => (
@@ -125,23 +127,22 @@ export function ImagePicker({
         ) : (
           <div className="flex flex-col gap-3 p-4">
             <p className="text-subhead text-label-2">
-              Интернеттен суретті тауып, оны тышқанның оң жағымен басып, «Сурет мекенжайын көшіру» (Копировать адрес
-              изображения) таңдаңыз. Содан кейін осында қойыңыз.
+              {t.image.linkHint}
             </p>
             <input
               className={fieldClass}
               value={link}
               onChange={(e) => setLink(e.target.value)}
               placeholder="https://…"
-              aria-label="Суреттің сілтемесі"
+              aria-label={t.image.linkLabel}
               inputMode="url"
             />
             {link.trim() && !linkImage.success && (
-              <p className="text-subhead text-orange">Сілтеме https:// деп басталуы керек</p>
+              <p className="text-subhead text-orange">{t.image.linkHttps}</p>
             )}
             {linkImage.success && <RemoteImage image={linkImage.data} className="max-h-60" />}
             <Button size="lg" disabled={!linkImage.success} onClick={() => linkImage.success && onPick(linkImage.data)}>
-              Суретті қосу
+              {t.image.addThis}
             </Button>
           </div>
         )}

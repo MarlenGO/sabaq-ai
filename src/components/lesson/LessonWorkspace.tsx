@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { topicPackageSchema, type TopicPackage } from "@/types/topic-package";
-import { languageNames, subjectNames } from "@/lib/labels";
+import type { GameId } from "@/games/registry";
+import { useT } from "@/i18n/client";
 import { getTemplate } from "@/slides/templates";
 import { Card } from "@/components/ui/Card";
 import { ArrowLeftIcon, CheckIcon, EyeIcon, GameIcon, PencilIcon, SlidesIcon } from "@/components/ui/Icons";
+import { buttonClass } from "@/components/ui/Button";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { PackageEditor } from "@/components/slides/PackageEditor";
+import { SlideEditor } from "@/components/slides/SlideEditor";
 import { SlidePreview } from "@/components/slides/SlidePreview";
 import { DownloadPptxButton } from "@/components/slides/DownloadPptxButton";
 import { TemplatePicker } from "@/components/slides/TemplatePicker";
@@ -20,13 +22,26 @@ type SaveState = "saved" | "saving" | "invalid" | "error";
 
 const SAVE_DELAY_MS = 800;
 
-// Рабочее место урока: вкладки «Презентация / Ойындар» и переключатель
+interface LessonWorkspaceProps {
+  initial: TopicPackage;
+  /** Что учитель выбрал на главной: презентацию или игру. Показываем только это. */
+  tab: Tab;
+  /** Только просмотр (открыто из истории): без конструктора и настроек */
+  readOnly: boolean;
+  /** Какую игру открыть сразу (из истории) */
+  game?: GameId;
+}
+
+// Рабочее место урока: презентация или игры (что выбрано на главной) и переключатель
 // «Конструктор / Алдын ала көру». Правки сохраняются на сервер сами
 // через секунду после последнего изменения.
-export function LessonWorkspace({ initial, initialTab }: { initial: TopicPackage; initialTab: Tab }) {
+export function LessonWorkspace({ initial, tab, readOnly, game }: LessonWorkspaceProps) {
   const [lesson, setLesson] = useState(initial);
-  const [tab, setTab] = useState<Tab>(initialTab);
-  const [mode, setMode] = useState<Mode>("preview");
+  const t = useT();
+  const [editMode, setMode] = useState<Mode>("preview");
+  const mode: Mode = readOnly ? "preview" : editMode;
+  const base = `/lesson/${lesson.id}`;
+  const otherTab = tab === "slides" ? "games" : "slides";
   const [save, setSave] = useState<SaveState>("saved");
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -56,71 +71,85 @@ export function LessonWorkspace({ initial, initialTab }: { initial: TopicPackage
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-24 pt-6">
-      <Link href="/" className="inline-flex items-center gap-1.5 text-subhead font-medium text-accent hover:opacity-70">
+      <Link
+        href={readOnly ? "/history" : "/"}
+        className="inline-flex items-center gap-1.5 text-subhead font-medium text-accent hover:opacity-70"
+      >
         <ArrowLeftIcon />
-        Басты бет
+        {readOnly ? t.lesson.backHistory : t.lesson.back}
       </Link>
 
       <header className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-large font-bold tracking-tight">{lesson.topic}</h1>
           <p className="mt-1 text-subhead text-label-2">
-            {subjectNames[lesson.subject]} · {lesson.grade}-сынып · {languageNames[lesson.language]}
+            {t.subjects[lesson.subject]} · {t.common.grade(lesson.grade)} · {t.languages[lesson.language]}
           </p>
         </div>
-        <SaveStatus state={save} />
+        {readOnly ? (
+          <Link href={`${base}?tab=${tab}`} className={buttonClass("tinted", "lg")}>
+            <PencilIcon />
+            {t.lesson.editButton}
+          </Link>
+        ) : (
+          <SaveStatus state={save} />
+        )}
       </header>
 
       {lesson.source === "demo" && (
         <Card className="mt-4 bg-orange/12 p-4 text-subhead shadow-none">
-          <b>Демо-режим.</b> AI кілті әлі қосылмаған, сондықтан мазмұны — мысал (Ньютон заңы). Кілтті қосқаннан
-          кейін жаңа тақырыптар үшін нағыз мазмұн жасалады.
+          <b>{t.lesson.demo}</b> {t.lesson.demoText}
         </Card>
       )}
 
-      <div className="sticky top-14 z-40 -mx-4 mt-6 flex flex-wrap items-center justify-between gap-3 border-b border-separator bg-bg/85 px-4 py-3 backdrop-blur-xl">
-        <SegmentedControl
-          size="lg"
-          ariaLabel="Бөлім"
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: "slides", label: "Презентация", icon: <SlidesIcon /> },
-            { value: "games", label: "Ойындар", icon: <GameIcon /> },
-          ]}
-        />
-        <SegmentedControl
-          size="lg"
-          ariaLabel="Режим"
-          value={mode}
-          onChange={setMode}
-          options={[
-            { value: "edit", label: "Конструктор", icon: <PencilIcon /> },
-            { value: "preview", label: "Алдын ала көру", icon: <EyeIcon /> },
-          ]}
-        />
-      </div>
+      {readOnly ? (
+        <p className="mt-6 flex items-center gap-2 rounded-2xl bg-fill px-4 py-3 text-subhead text-label-2">
+          <EyeIcon />
+          {t.lesson.readOnly}
+        </p>
+      ) : (
+        <div className="sticky top-14 z-40 -mx-4 mt-6 flex flex-wrap items-center justify-between gap-3 border-b border-separator bg-bg/85 px-4 py-3 backdrop-blur-xl">
+          <SegmentedControl
+            size="lg"
+            ariaLabel={t.common.mode}
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: "edit", label: t.common.edit, icon: <PencilIcon /> },
+              { value: "preview", label: t.common.preview, icon: <EyeIcon /> },
+            ]}
+          />
+          {/* Вторая часть урока — не переключателем, а тихой ссылкой: учитель уже выбрал, что делает */}
+          <Link
+            href={`${base}?tab=${otherTab}`}
+            className="inline-flex h-11 items-center gap-1.5 rounded-xl px-3 text-subhead font-semibold text-accent hover:bg-accent/10"
+          >
+            {otherTab === "games" ? <GameIcon /> : <SlidesIcon />}
+            {otherTab === "games" ? t.lesson.makeGame : t.lesson.makeSlides}
+          </Link>
+        </div>
+      )}
 
       <div className="mt-6">
         {tab === "slides" ? (
           <div className="flex flex-col gap-6">
             {mode === "edit" ? (
               <>
-                <Card className="p-4 sm:p-6">
-                  <PackageEditor pkg={lesson} onChange={update} />
-                </Card>
+                <SlideEditor pkg={lesson} onChange={update} />
                 <DownloadPptxButton pkg={lesson} />
               </>
             ) : (
               <>
-                <section>
-                  <h2 className="mb-3 text-title3 font-semibold">Шаблонды таңдаңыз</h2>
-                  <TemplatePicker
-                    pkg={lesson}
-                    value={getTemplate(lesson.templateId, lesson.subject).id}
-                    onChange={(templateId) => update({ ...lesson, templateId })}
-                  />
-                </section>
+                {!readOnly && (
+                  <section>
+                    <h2 className="mb-3 text-title3 font-semibold">{t.lesson.chooseTemplate}</h2>
+                    <TemplatePicker
+                      pkg={lesson}
+                      value={getTemplate(lesson.templateId, lesson.subject).id}
+                      onChange={(templateId) => update({ ...lesson, templateId })}
+                    />
+                  </section>
+                )}
                 <DownloadPptxButton pkg={lesson} />
                 <SlidePreview pkg={lesson} />
               </>
@@ -130,6 +159,8 @@ export function LessonWorkspace({ initial, initialTab }: { initial: TopicPackage
           <GamesPanel
             lesson={lesson}
             mode={mode}
+            readOnly={readOnly}
+            initialGame={game}
             onChange={update}
             onJeopardyReady={(jeopardy, updatedAt) => setLesson({ ...lesson, jeopardy, updatedAt })}
           />
@@ -140,11 +171,12 @@ export function LessonWorkspace({ initial, initialTab }: { initial: TopicPackage
 }
 
 function SaveStatus({ state }: { state: SaveState }) {
+  const t = useT();
   const view: Record<SaveState, { text: string; className: string }> = {
-    saved: { text: "Сақталды", className: "text-green" },
-    saving: { text: "Сақталуда…", className: "text-label-2" },
-    invalid: { text: "Бос өрістерді толтырыңыз — содан кейін өзі сақталады", className: "text-orange" },
-    error: { text: "Сақталмады. Интернетті тексеріңіз", className: "text-red" },
+    saved: { text: t.lesson.saved, className: "text-green" },
+    saving: { text: t.lesson.saving, className: "text-label-2" },
+    invalid: { text: t.lesson.invalid, className: "text-orange" },
+    error: { text: t.lesson.saveError, className: "text-red" },
   };
   const { text, className } = view[state];
   return (

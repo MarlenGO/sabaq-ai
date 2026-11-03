@@ -1,3 +1,4 @@
+import { apiError } from "@/lib/api-errors";
 import { sortResults, toResult } from "@/lib/rooms";
 import { finishRoom, getRoom, listPlayers } from "@/lib/storage/rooms";
 
@@ -5,7 +6,7 @@ import { finishRoom, getRoom, listPlayers } from "@/lib/storage/rooms";
 export async function GET(_request: Request, ctx: RouteContext<"/api/rooms/[code]">) {
   const { code } = await ctx.params;
   const room = await getRoom(code);
-  if (!room) return Response.json({ error: "Ойын табылмады." }, { status: 404 });
+  if (!room) return apiError("roomNotFound", 404);
 
   const players = await listPlayers(code);
   return Response.json({
@@ -22,6 +23,6 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/rooms/[code
 export async function PATCH(_request: Request, ctx: RouteContext<"/api/rooms/[code]">) {
   const { code } = await ctx.params;
   const room = await finishRoom(code);
-  if (!room) return Response.json({ error: "Ойын табылмады." }, { status: 404 });
+  if (!room) return apiError("roomNotFound", 404);
   return Response.json({ status: room.status });
 }

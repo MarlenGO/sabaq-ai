@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { CheckIcon, XIcon } from "@/components/ui/Icons";
 import { RemoteImage } from "@/components/ui/RemoteImage";
 import { EmptyGame } from "./GameStage";
+import { useT } from "@/i18n/client";
 
 // Один плеер на два шаблона:
 //   test — спокойно, по одному вопросу, в конце оценка;
@@ -16,13 +17,23 @@ const QUIZ_SECONDS = 20;
 const letters = ["A", "B", "C", "D"];
 const tileColors = ["bg-accent", "bg-orange", "bg-green", "bg-purple"];
 
-export function QuestionPlayer({ questions, variant }: { questions: QuizQuestion[]; variant: "test" | "quiz" }) {
+export function QuestionPlayer({
+  questions,
+  variant,
+  onFirstAnswer,
+}: {
+  questions: QuizQuestion[];
+  variant: "test" | "quiz";
+  /** Для истории: игра действительно началась */
+  onFirstAnswer?: () => void;
+}) {
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const [correct, setCorrect] = useState(0);
   const [points, setPoints] = useState(0);
   const [timeLeft, setTimeLeft] = useState(QUIZ_SECONDS);
   const [finished, setFinished] = useState(false);
+  const t = useT();
 
   const timed = variant === "quiz";
   const timedOut = timed && timeLeft <= 0 && picked === null;
@@ -34,7 +45,7 @@ export function QuestionPlayer({ questions, variant }: { questions: QuizQuestion
     return () => clearInterval(timer);
   }, [timed, revealed, finished, index]);
 
-  if (questions.length === 0) return <EmptyGame text="Сұрақтар жоқ. «Конструктор» бөлімінде қосыңыз." />;
+  if (questions.length === 0) return <EmptyGame text={t.games_ui.noQuestions} />;
 
   const restart = () => {
     setIndex(0);
@@ -48,17 +59,17 @@ export function QuestionPlayer({ questions, variant }: { questions: QuizQuestion
   if (finished) {
     return (
       <div className="flex flex-col items-center gap-3 py-10 text-center">
-        <p className="text-title3 text-label-2">Ойын аяқталды!</p>
+        <p className="text-title3 text-label-2">{t.common.gameOver}</p>
         {timed ? (
-          <p className="text-display font-bold text-accent">{points} ұпай</p>
+          <p className="text-display font-bold text-accent">{t.common.points(points)}</p>
         ) : (
-          <p className="text-display font-bold text-accent">Баға: {schoolGrade(correct, questions.length)}</p>
+          <p className="text-display font-bold text-accent">{t.common.mark(schoolGrade(correct, questions.length))}</p>
         )}
         <p className="text-body text-label-2">
-          {questions.length} сұрақтың {correct}-іне дұрыс жауап берілді
+          {t.games_ui.answeredOf(correct, questions.length)}
         </p>
         <Button size="lg" onClick={restart} className="mt-4">
-          Қайта бастау
+          {t.common.restart}
         </Button>
       </div>
     );
@@ -69,6 +80,7 @@ export function QuestionPlayer({ questions, variant }: { questions: QuizQuestion
 
   const pick = (option: number) => {
     if (revealed) return;
+    onFirstAnswer?.();
     setPicked(option);
     if (option === q.correctIndex) {
       setCorrect((c) => c + 1);
@@ -100,7 +112,7 @@ export function QuestionPlayer({ questions, variant }: { questions: QuizQuestion
         </div>
         {timed && (
           <span className="min-w-16 text-right text-subhead font-semibold tabular-nums">
-            {Math.max(timeLeft, 0)} с · {points}
+            {Math.max(timeLeft, 0)} {t.common.seconds} · {points}
           </span>
         )}
       </div>
@@ -157,16 +169,16 @@ export function QuestionPlayer({ questions, variant }: { questions: QuizQuestion
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-body">
             {timedOut ? (
-              <span className="font-semibold text-orange">Уақыт бітті!</span>
+              <span className="font-semibold text-orange">{t.common.timeUp}</span>
             ) : picked === q.correctIndex ? (
-              <span className="font-semibold text-green">Дұрыс!</span>
+              <span className="font-semibold text-green">{t.common.correct}</span>
             ) : (
-              <span className="font-semibold text-red">Қате.</span>
+              <span className="font-semibold text-red">{t.common.wrong}</span>
             )}{" "}
             {q.explanation && <span className="text-label-2">{q.explanation}</span>}
           </p>
           <Button size="lg" onClick={next} className="shrink-0">
-            {isLast ? "Нәтижені көру" : "Келесі сұрақ"}
+            {isLast ? t.common.seeResult : t.common.nextQuestion}
           </Button>
         </div>
       )}

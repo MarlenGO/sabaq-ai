@@ -1,4 +1,4 @@
-import type { Language, LessonRequest, TopicPackage } from "@/types/topic-package";
+import type { Language, LessonRequest, Subject, TopicPackage } from "@/types/topic-package";
 
 // Промпты короткие: структуру ответа задаёт JSON-схема, а не примеры в тексте.
 // Это экономит токены, особенно на казахском, где текст «дороже».
@@ -6,6 +6,21 @@ import type { Language, LessonRequest, TopicPackage } from "@/types/topic-packag
 const languageName: Record<Language, string> = {
   kk: "казахском языке (кириллица, грамотно, без русских слов)",
   ru: "русском языке",
+};
+
+const subjectPromptNames: Record<Subject, string> = {
+  physics: "физика",
+  chemistry: "химия",
+  biology: "биология",
+  history: "история",
+  geography: "география",
+  math: "математика",
+  informatics: "информатика",
+  kazakh: "казахский язык",
+  russian: "русский язык",
+  literature: "литература",
+  english: "английский язык",
+  other: "общий урок (предмет определи по теме)",
 };
 
 export function systemPrompt(language: Language, grade: number) {
@@ -16,11 +31,11 @@ export function systemPrompt(language: Language, grade: number) {
   ].join("\n");
 }
 
-export function packagePrompt({ topic, grade }: LessonRequest) {
+export function packagePrompt({ topic, grade, subject }: LessonRequest) {
   return [
-    `Тема урока: «${topic}», ${grade} класс.`,
+    `Предмет: ${subjectPromptNames[subject]}. Тема урока: «${topic}», ${grade} класс.`,
+    "Раскрывай тему именно с точки зрения этого предмета.",
     "Составь пакет темы:",
-    "- subject: предмет темы;",
     "- definition: главное определение, 1–2 предложения;",
     "- formula: только если у темы есть формула, иначе не указывай;",
     "- keyFacts: 5 ключевых фактов;",

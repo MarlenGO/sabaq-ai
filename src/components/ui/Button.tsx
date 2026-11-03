@@ -23,11 +23,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: Size;
 }
 
+/** Классы кнопки — чтобы ссылка (<Link>) выглядела как кнопка */
+export const buttonClass = (variant: Variant = "filled", size: Size = "md") =>
+  `inline-flex items-center justify-center gap-2 font-semibold transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 ${sizes[size]} ${variants[variant]}`;
+
 export function Button({ variant = "filled", size = "md", className = "", ...props }: ButtonProps) {
-  return (
-    <button
-      className={`inline-flex items-center justify-center gap-2 font-semibold transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 ${sizes[size]} ${variants[variant]} ${className}`}
-      {...props}
-    />
-  );
+  return <button className={`${buttonClass(variant, size)} ${className}`} {...props} />;
 }

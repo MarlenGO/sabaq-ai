@@ -4,17 +4,19 @@ import { useState } from "react";
 import type { Jeopardy } from "@/types/topic-package";
 import { Button } from "@/components/ui/Button";
 import { RemoteImage } from "@/components/ui/RemoteImage";
+import { useT } from "@/i18n/client";
 
 // «Өз ойын»: тақта, сұрақты ашу, жауабын көрсету, екі команданың ұпайы.
 // Очки за вопрос зависят от его места в рубрике: 1-й — 100, 5-й — 500.
 
 const pointsOf = (index: number) => (index + 1) * 100;
 
-export function JeopardyBoard({ jeopardy }: { jeopardy: Jeopardy }) {
+export function JeopardyBoard({ jeopardy, onFirstAnswer }: { jeopardy: Jeopardy; onFirstAnswer?: () => void }) {
   const [used, setUsed] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<{ c: number; q: number } | null>(null);
   const [showAnswer, setShowAnswer] = useState(false);
   const [teams, setTeams] = useState([0, 0]);
+  const t = useT();
 
   const close = (winner?: number) => {
     if (!open) return;
@@ -23,8 +25,6 @@ export function JeopardyBoard({ jeopardy }: { jeopardy: Jeopardy }) {
     setOpen(null);
     setShowAnswer(false);
   };
-
-  const cols = jeopardy.categories.length;
 
   if (open) {
     const category = jeopardy.categories[open.c];
@@ -42,17 +42,17 @@ export function JeopardyBoard({ jeopardy }: { jeopardy: Jeopardy }) {
             <div className="flex flex-wrap justify-center gap-2">
               {teams.map((_, i) => (
                 <Button key={i} variant="light" onClick={() => close(i)}>
-                  +{pointsOf(open.q)} — {i + 1}-команда
+                  +{pointsOf(open.q)} — {t.games_ui.team(i + 1)}
                 </Button>
               ))}
               <Button variant="light" onClick={() => close()}>
-                Ешкім
+                {t.games_ui.nobody}
               </Button>
             </div>
           </>
         ) : (
           <Button size="lg" variant="light" onClick={() => setShowAnswer(true)}>
-            Жауабын көрсету
+            {t.games_ui.showAnswer}
           </Button>
         )}
       </div>
@@ -64,17 +64,18 @@ export function JeopardyBoard({ jeopardy }: { jeopardy: Jeopardy }) {
       <div className="flex justify-center gap-3">
         {teams.map((score, i) => (
           <div key={i} className="rounded-2xl bg-surface px-5 py-2 text-center shadow-card">
-            <p className="text-footnote text-label-2">{i + 1}-команда</p>
+            <p className="text-footnote text-label-2">{t.games_ui.team(i + 1)}</p>
             <p className="text-title2 font-bold tabular-nums">{score}</p>
           </div>
         ))}
       </div>
 
+      {/* Как в телевизионной «Своей игре»: каждая тема — строка, слева название, справа цены */}
       <div className="overflow-x-auto">
-        <div className="grid min-w-[36rem] gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+        <div className="flex min-w-[36rem] flex-col gap-2">
           {jeopardy.categories.map((category, c) => (
-            <div key={c} className="flex flex-col gap-2">
-              <div className="flex min-h-16 items-center justify-center rounded-xl bg-indigo px-2 py-2 text-center text-subhead font-bold text-white">
+            <div key={c} className="grid grid-cols-[minmax(9rem,1.6fr)_repeat(5,minmax(0,1fr))] gap-2">
+              <div className="flex min-h-16 items-center rounded-xl bg-indigo px-4 py-2 text-subhead font-bold text-white">
                 {category.title}
               </div>
               {category.questions.map((_, q) => {
@@ -84,8 +85,11 @@ export function JeopardyBoard({ jeopardy }: { jeopardy: Jeopardy }) {
                     key={q}
                     type="button"
                     disabled={isUsed}
-                    onClick={() => setOpen({ c, q })}
-                    className="h-16 rounded-xl bg-accent text-title2 font-bold text-white transition hover:brightness-110 active:scale-[0.97] disabled:bg-fill disabled:text-label-3"
+                    onClick={() => {
+                      onFirstAnswer?.();
+                      setOpen({ c, q });
+                    }}
+                    className="min-h-16 rounded-xl bg-accent text-title2 font-bold text-white transition hover:brightness-110 active:scale-[0.97] disabled:bg-fill disabled:text-label-3"
                   >
                     {isUsed ? "" : pointsOf(q)}
                   </button>

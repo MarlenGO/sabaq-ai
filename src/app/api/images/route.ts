@@ -1,3 +1,4 @@
+import { apiError } from "@/lib/api-errors";
 // GET /api/images?q=… — поиск картинок в Wikimedia Commons (бесплатно, без ключа).
 // Запрос идёт через наш сервер: так Wikimedia видит понятный User-Agent,
 // как просят их правила, а браузеру не мешают ограничения CORS.
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
     headers: { "User-Agent": "SabaqAI/0.1 (lesson builder for teachers in Kazakhstan)" },
     signal: AbortSignal.timeout(10_000),
   }).catch(() => null);
-  if (!response?.ok) return Response.json({ error: "Суреттер табылмады. Интернетті тексеріңіз." }, { status: 502 });
+  if (!response?.ok) return apiError("imagesFailed", 502);
 
   const data = (await response.json()) as { query?: { pages?: Record<string, CommonsPage & { index?: number }> } };
   const pages = Object.values(data.query?.pages ?? {}).sort((a, b) => (a.index ?? 0) - (b.index ?? 0));

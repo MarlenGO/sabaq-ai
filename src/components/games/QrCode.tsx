@@ -15,7 +15,7 @@ export function QrCode({ text, className = "" }: { text: string; className?: str
   const box = size + margin * 2;
 
   return (
-    <svg viewBox={`0 0 ${box} ${box}`} className={className} role="img" aria-label="QR-код" shapeRendering="crispEdges">
+    <svg viewBox={`0 0 ${box} ${box}`} className={className} role="img" aria-label="QR" shapeRendering="crispEdges">
       <rect width={box} height={box} fill="#fff" />
       <path d={cells.join("")} fill="#000" />
     </svg>

@@ -1,10 +1,11 @@
+import { apiError } from "@/lib/api-errors";
 import { topicPackageSchema } from "@/types/topic-package";
 import { getLesson, saveLesson } from "@/lib/storage/lessons";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/lessons/[id]">) {
   const { id } = await ctx.params;
   const lesson = await getLesson(id);
-  if (!lesson) return Response.json({ error: "Сабақ табылмады." }, { status: 404 });
+  if (!lesson) return apiError("lessonNotFound", 404);
   return Response.json(lesson);
 }
 
@@ -12,11 +13,11 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/lessons/[id
 export async function PUT(request: Request, ctx: RouteContext<"/api/lessons/[id]">) {
   const { id } = await ctx.params;
   const existing = await getLesson(id);
-  if (!existing) return Response.json({ error: "Сабақ табылмады." }, { status: 404 });
+  if (!existing) return apiError("lessonNotFound", 404);
 
   const parsed = topicPackageSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return Response.json({ error: "Деректер толық емес.", issues: parsed.error.issues.slice(0, 5) }, { status: 400 });
+    return apiError("incomplete", 400, { issues: parsed.error.issues.slice(0, 5) });
   }
 
   // id, источник и дату создания из браузера не принимаем.

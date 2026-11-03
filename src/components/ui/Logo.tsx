@@ -22,7 +22,7 @@ export function Logo() {
   return (
     <span className="flex items-center gap-2">
       <LogoMark />
-      <span className="text-title3 font-bold tracking-tight">
+      <span className="hidden text-title3 font-bold tracking-tight min-[400px]:inline">
         Sabaq
         <span className="ml-1 bg-linear-to-r from-accent to-purple bg-clip-text text-transparent">AI</span>
       </span>

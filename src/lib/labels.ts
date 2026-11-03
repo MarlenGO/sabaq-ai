@@ -1,19 +1,22 @@
-import type { Language, Subject } from "@/types/topic-package";
+import type { Subject } from "@/types/topic-package";
 
-export const subjectNames: Record<Subject, string> = {
-  physics: "Физика",
-  chemistry: "Химия",
-  biology: "Биология",
-  history: "Тарих",
-  geography: "География",
-  math: "Математика",
-  other: "Пән",
-};
+// Названия предметов, игр и т.п. — в словарях src/i18n (kk.ts, ru.ts).
 
-export const languageNames: Record<Language, string> = {
-  kk: "Қазақша",
-  ru: "Русский",
-};
+/** Порядок кнопок предметов на главной */
+export const subjectOrder: Subject[] = [
+  "physics",
+  "math",
+  "informatics",
+  "chemistry",
+  "biology",
+  "geography",
+  "history",
+  "kazakh",
+  "russian",
+  "literature",
+  "english",
+  "other",
+];
 
 // Перевод доли правильных ответов в привычную пятибалльную оценку
 export function schoolGrade(correct: number, total: number) {

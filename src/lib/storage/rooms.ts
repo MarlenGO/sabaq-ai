@@ -81,6 +81,13 @@ export async function listPlayers(code: string): Promise<Player[]> {
   return players.filter((p): p is Player => p !== null);
 }
 
+/** Все комнаты (для истории) */
+export async function listRooms(): Promise<Room[]> {
+  const codes = await readdir(DIR).catch(() => [] as string[]);
+  const rooms = await Promise.all(codes.map((code) => getRoom(code)));
+  return rooms.filter((r): r is Room => r !== null);
+}
+
 /** Записать ответ; null — если на этот вопрос ученик уже отвечал */
 export function saveAnswer(code: string, playerId: string, answer: Player["answers"][number]) {
   return withLock(`${code}/${playerId}`, async () => {

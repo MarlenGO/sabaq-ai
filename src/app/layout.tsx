@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense, type ReactNode } from "react";
 import { Inter } from "next/font/google";
+import { getLocale } from "@/i18n/server";
+import { LocaleProvider } from "@/i18n/client";
 import { NavBar } from "@/components/ui/NavBar";
 import { preferencesScript } from "@/lib/preferences-script";
 import "./globals.css";
@@ -25,9 +28,21 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: preferencesScript }} />
       </head>
       <body className="min-h-full flex flex-col">
-        <NavBar />
-        {children}
+        {/* Язык сайта читается из cookie, а это данные запроса — поэтому внутри Suspense */}
+        <Suspense>
+          <WithLocale>{children}</WithLocale>
+        </Suspense>
       </body>
     </html>
+  );
+}
+
+async function WithLocale({ children }: { children: ReactNode }) {
+  const locale = await getLocale();
+  return (
+    <LocaleProvider locale={locale}>
+      <NavBar />
+      {children}
+    </LocaleProvider>
   );
 }

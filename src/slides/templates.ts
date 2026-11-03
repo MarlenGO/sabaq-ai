@@ -108,6 +108,7 @@ const bySubject: Partial<Record<Subject, string>> = {
   physics: "science",
   chemistry: "science",
   math: "science",
+  informatics: "dark",
   biology: "nature",
   geography: "nature",
   history: "history",
