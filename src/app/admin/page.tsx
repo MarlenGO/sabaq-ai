@@ -8,6 +8,7 @@ import { getT } from "@/i18n/server";
 import { Card } from "@/components/ui/Card";
 import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminLibrary } from "@/components/admin/AdminLibrary";
+import { CleanupButton } from "@/components/admin/CleanupButton";
 import type { DeckType, Subject } from "@/types/topic-package";
 import type { GameId } from "@/games/registry";
 
@@ -52,7 +53,13 @@ async function Admin({ searchParams }: { searchParams: PageProps<"/admin">["sear
           </Link>
         ))}
       </nav>
-      <div className="mt-6">
+      {/* У библиотеки нет истории — это подборка уроков, её не чистим */}
+      {tab !== "library" && (
+        <div className="mt-4">
+          <CleanupButton target={tab} />
+        </div>
+      )}
+      <div className="mt-4">
         {tab === "users" && <UsersTab selfId={admin.id} />}
         {tab === "ai" && <AiTab t={t} />}
         {tab === "errors" && <ErrorsTab t={t} />}

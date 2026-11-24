@@ -37,12 +37,14 @@ interface LessonWorkspaceProps {
   game?: GameId;
   /** Есть ли ключ AI — тогда в конструкторе видны кнопки «AI» */
   aiEnabled: boolean;
+  /** Урок только что создан: «Артқа» спрашивает, оставить ли его в истории */
+  isNew?: boolean;
 }
 
 // Рабочее место урока: презентация или игры (что выбрано на главной) и переключатель
 // «Конструктор / Алдын ала көру». Правки сохраняются на сервер сами
 // через секунду после последнего изменения.
-export function LessonWorkspace({ initial, tab, readOnly, copyable, game, aiEnabled }: LessonWorkspaceProps) {
+export function LessonWorkspace({ initial, tab, readOnly, copyable, game, aiEnabled, isNew = false }: LessonWorkspaceProps) {
   const [lesson, setLesson] = useState(initial);
   const t = useT();
   const [editMode, setMode] = useState<Mode>("preview");
@@ -78,13 +80,7 @@ export function LessonWorkspace({ initial, tab, readOnly, copyable, game, aiEnab
 
   return (
     <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-24 pt-6 sm:px-8">
-      <Link
-        href={readOnly ? "/history" : "/"}
-        className="inline-flex items-center gap-1.5 text-subhead font-medium text-accent hover:opacity-70"
-      >
-        <ArrowLeftIcon />
-        {readOnly ? t.lesson.backHistory : t.lesson.back}
-      </Link>
+      <BackButton lessonId={lesson.id} askToKeep={isNew && !readOnly} />
 
       <header className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -134,7 +130,9 @@ export function LessonWorkspace({ initial, tab, readOnly, copyable, game, aiEnab
               { value: "preview", label: t.common.preview, icon: <EyeIcon /> },
             ]}
           />
-          {/* Вторая часть урока — не переключателем, а тихой ссылкой: учитель уже выбрал, что делает */}
+          {/* Вторая часть урока — тихой ссылкой: к презентации можно добавить игру.
+              Со страницы игры ссылку на презентацию не показываем — учитель делает игру */}
+          {tab === "slides" && (
           <Link
             href={`${base}?tab=${otherTab}`}
             className="inline-flex h-11 items-center gap-1.5 rounded-xl px-3 text-subhead font-semibold text-accent hover:bg-accent/10"
@@ -142,6 +140,7 @@ export function LessonWorkspace({ initial, tab, readOnly, copyable, game, aiEnab
             {otherTab === "games" ? <GameIcon /> : <SlidesIcon />}
             {otherTab === "games" ? t.lesson.makeGame : t.lesson.makeSlides}
           </Link>
+          )}
         </div>
       )}
 
@@ -240,5 +239,62 @@ function SaveStatus({ state }: { state: SaveState }) {
       {state === "saved" && <CheckIcon />}
       {text}
     </p>
+  );
+}
+
+/**
+ * «Артқа» — на предыдущую страницу. У только что созданного урока сначала спрашиваем,
+ * сохранить ли его в истории: иначе история засоряется пустыми пробными проектами.
+ */
+function BackButton({ lessonId, askToKeep }: { lessonId: string; askToKeep: boolean }) {
+  const t = useT();
+  const router = useRouter();
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [deleting, startDelete] = useTransition();
+
+  const goBack = () => {
+    // Открыли урок по прямой ссылке — «назад» некуда, идём на главную
+    if (window.history.length > 1) router.back();
+    else router.push("/");
+  };
+  const discard = () =>
+    startDelete(async () => {
+      await fetch(`/api/lessons/${lessonId}`, { method: "DELETE" }).catch(() => null);
+      dialog.current?.close();
+      goBack();
+    });
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => (askToKeep ? dialog.current?.showModal() : goBack())}
+        className="inline-flex h-11 items-center gap-1.5 rounded-full pr-3 text-subhead font-semibold text-accent hover:opacity-70"
+      >
+        <ArrowLeftIcon />
+        {t.lesson.back}
+      </button>
+      <dialog
+        ref={dialog}
+        aria-labelledby="keep-title"
+        className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-3xl bg-surface p-6 text-label shadow-2xl backdrop:bg-black/40"
+      >
+        <h2 id="keep-title" className="text-title3 font-bold">
+          {t.lesson.keepTitle}
+        </h2>
+        <p className="mt-2 text-body text-label-2">{t.lesson.keepText}</p>
+        <div className="mt-6 flex flex-col gap-2">
+          <Button type="button" size="lg" onClick={goBack} disabled={deleting}>
+            {t.lesson.keep}
+          </Button>
+          <Button type="button" variant="tinted" size="lg" onClick={discard} disabled={deleting} className="text-red!">
+            {t.lesson.discard}
+          </Button>
+          <Button type="button" variant="plain" size="lg" onClick={() => dialog.current?.close()} disabled={deleting}>
+            {t.lesson.stay}
+          </Button>
+        </div>
+      </dialog>
+    </>
   );
 }

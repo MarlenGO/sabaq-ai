@@ -64,7 +64,9 @@ export function CreateForm({ subject, kind }: { subject: Subject; kind: Exclude<
       }).catch(() => null);
       const data = await response?.json().catch(() => null);
       if (response?.ok && data?.id) {
-        router.push(isDeck ? `/lesson/${data.id}?tab=slides` : `/lesson/${data.id}?game=${kind.id}`);
+        // new=1 — только что созданный урок: «Артқа» спросит, оставить ли его в истории
+        const fresh = data.created ? "&new=1" : "";
+        router.push(isDeck ? `/lesson/${data.id}?tab=slides${fresh}` : `/lesson/${data.id}?game=${kind.id}${fresh}`);
         return;
       }
       setError(data?.error ?? t.form.netError);

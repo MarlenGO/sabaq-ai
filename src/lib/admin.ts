@@ -1,4 +1,4 @@
-import { count, q, select } from "@/lib/db";
+import { count, q, remove, select } from "@/lib/db";
 import { currentUser, listUsers, type User } from "@/lib/auth";
 import { apiError } from "@/lib/api-errors";
 import { listAllLessons } from "@/lib/storage/lessons";
@@ -146,3 +146,45 @@ export const loadLibrary = () => listAllLessons(300);
 export const isSelf = (admin: User, id: string) => admin.id === id;
 
 export const userQuery = (id: string) => `id=eq.${q(id)}`;
+
+// ——— Очистка истории (кнопка «Тарихты тазалау» на вкладках админки) ———
+// Удаляем только старое и служебное, чтобы база не разрасталась. Сегодняшние записи
+// не трогаем: по ним считается дневной лимит AI и идут сегодняшние игры.
+
+export const cleanupTargets = ["users", "ai", "errors", "stats"] as const;
+export type CleanupTarget = (typeof cleanupTargets)[number];
+
+const cleanupPlan = (target: CleanupTarget): { table: string; query: string }[] => {
+  const now = q(new Date().toISOString());
+  const today = q(startOfToday());
+  switch (target) {
+    // Истёкшие входы и использованные / просроченные ссылки для входа
+    case "users":
+      return [
+        { table: "sessions", query: `expires_at=lt.${now}` },
+        { table: "login_links", query: `or=(expires_at.lt.${now},used_at.not.is.null)` },
+      ];
+    // Журнал запросов к AI до сегодняшнего дня
+    case "ai":
+      return [{ table: "ai_usage", query: `at=lt.${today}` }];
+    // Все ошибки AI
+    case "errors":
+      return [{ table: "ai_usage", query: "ok=is.false" }];
+    // Прошлые QR-игры (с учениками и ответами — удалятся вместе с комнатой) и журнал действий
+    case "stats":
+      return [
+        { table: "rooms", query: `created_at=lt.${today}` },
+        { table: "activity", query: `at=lt.${today}` },
+      ];
+  }
+};
+
+/** Удалить историю вкладки; возвращает, сколько записей удалено */
+export async function cleanup(target: CleanupTarget) {
+  let removed = 0;
+  for (const { table, query } of cleanupPlan(target)) {
+    removed += await count(table, query);
+    await remove(table, query);
+  }
+  return removed;
+}

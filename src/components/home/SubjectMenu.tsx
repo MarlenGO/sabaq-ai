@@ -5,7 +5,7 @@ import { useState, type ReactNode } from "react";
 import type { Subject } from "@/types/topic-package";
 import { deckTypeOrder } from "@/slides/structures";
 import { games } from "@/games/registry";
-import { deckTypeIcon, docIcon, gameIcon } from "@/data/catalog";
+import { deckTypeIcon, docIcon, docPath, gameIcon } from "@/data/catalog";
 import { docKinds } from "@/types/documents";
 import { useT } from "@/i18n/client";
 import { SearchField } from "@/components/ui/SearchField";
@@ -62,7 +62,7 @@ export function SubjectMenu({ subject }: { subject: Subject }) {
         {docs.length > 0 && (
           <List title={t.docs.title} hint={t.docs.hint}>
             {docs.map((item) => (
-              <Row key={item.id} item={item} href={`/subject/${subject}/${item.id}`} />
+              <Row key={item.id} item={item} href={`/subject/${subject}/${docPath(item.id)}`} />
             ))}
           </List>
         )}

@@ -1,7 +1,7 @@
 import { apiError } from "@/lib/api-errors";
 import { currentUser } from "@/lib/auth";
 import { topicPackageSchema } from "@/types/topic-package";
-import { canWrite, getLessonFor, saveLesson } from "@/lib/storage/lessons";
+import { canWrite, deleteLesson, getLessonFor, saveLesson } from "@/lib/storage/lessons";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/lessons/[id]">) {
   const user = await currentUser();
@@ -39,4 +39,17 @@ export async function PUT(request: Request, ctx: RouteContext<"/api/lessons/[id]
   };
   await saveLesson(lesson);
   return Response.json({ updatedAt: lesson.updatedAt });
+}
+
+// DELETE /api/lessons/:id — удалить свой урок («Артқа» → «Жоқ, өшіру»): пустые
+// и ненужные проекты не засоряют историю и базу
+export async function DELETE(_request: Request, ctx: RouteContext<"/api/lessons/[id]">) {
+  const user = await currentUser();
+  if (!user) return apiError("unauthorized", 401);
+  const { id } = await ctx.params;
+  const record = await getLessonFor(user, id);
+  if (!record) return apiError("lessonNotFound", 404);
+  if (!canWrite(user, record)) return apiError("forbidden", 403);
+  await deleteLesson(id);
+  return new Response(null, { status: 204 });
 }

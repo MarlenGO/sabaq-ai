@@ -82,11 +82,18 @@ export const docIcon: Record<DocKind, string> = {
 /** Что можно создать: документ, вид презентации или игра. Адрес — /subject/<предмет>/<id> */
 export type CreateKind = { type: "doc"; id: DocKind } | { type: "deck"; id: DeckType } | { type: "game"; id: GameId };
 
-/** Все id для адресов страниц создания (id видов, игр и документов не пересекаются) */
-export const createKindIds: string[] = [...docKinds, ...deckTypeOrder, ...games.map((g) => g.id)];
+/**
+ * Адрес документа — с приставкой «doc-»: у документа «Тест» и у игры «Тест» одинаковый id,
+ * без приставки они открывали одну и ту же страницу.
+ */
+export const docPath = (id: DocKind) => `doc-${id}`;
+
+/** Все части адресов страниц создания: документы (doc-…), виды презентаций и игры */
+export const createKindIds: string[] = [...docKinds.map(docPath), ...deckTypeOrder, ...games.map((g) => g.id)];
 
 export function kindOf(id: string): CreateKind | null {
-  if ((docKinds as string[]).includes(id)) return { type: "doc", id: id as DocKind };
+  const doc = id.startsWith("doc-") ? id.slice(4) : null;
+  if (doc && (docKinds as string[]).includes(doc)) return { type: "doc", id: doc as DocKind };
   if ((deckTypeOrder as string[]).includes(id)) return { type: "deck", id: id as DeckType };
   if (games.some((g) => g.id === id)) return { type: "game", id: id as GameId };
   return null;

@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   // Пустой проект: без AI и без кэша
   if (mode === "empty") {
     await createLesson(draft, user.id);
-    return Response.json({ id, cached: false });
+    return Response.json({ id, cached: false, created: true });
   }
 
   const key = cacheKey(parsed.data);
@@ -61,7 +61,8 @@ export async function POST(request: Request) {
       if (source === "ai") await putCached(key, { content, deck: lesson.deck });
     }
     await createLesson(lesson, user.id, key);
-    return Response.json({ id, cached: Boolean(cached) });
+    // created — урок новый: на его странице «Артқа» спросит, сохранить ли его в истории
+    return Response.json({ id, cached: Boolean(cached), created: true });
   } catch (error) {
     return await errorResponse(error);
   }

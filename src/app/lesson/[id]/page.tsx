@@ -7,7 +7,8 @@ import { LessonWorkspace } from "@/components/lesson/LessonWorkspace";
 import { hasAiKey } from "@/lib/ai/gemini";
 
 // ?tab=slides|games — что открыть, ?view=1 — только просмотр (из истории),
-// ?game=quiz — какую игру показать сразу. Чужой урок (из библиотеки) —
+// ?game=quiz — какую игру показать сразу, ?new=1 — урок только что создан.
+// Чужой урок (из библиотеки) —
 // только просмотр с кнопкой «Көшіріп алу».
 export default function LessonPage(props: PageProps<"/lesson/[id]">) {
   return (
@@ -20,7 +21,7 @@ export default function LessonPage(props: PageProps<"/lesson/[id]">) {
 async function Lesson({ params, searchParams }: PageProps<"/lesson/[id]">) {
   const user = await requireUser();
   const { id } = await params;
-  const { tab, view, game } = await searchParams;
+  const { tab, view, game, new: fresh } = await searchParams;
   const record = await getLessonFor(user, id);
   if (!record) notFound();
   const own = canWrite(user, record);
@@ -34,6 +35,7 @@ async function Lesson({ params, searchParams }: PageProps<"/lesson/[id]">) {
       copyable={!own}
       game={gameId}
       aiEnabled={hasAiKey()}
+      isNew={fresh === "1" && own}
     />
   );
 }
