@@ -5,7 +5,8 @@ import { useState, type ReactNode } from "react";
 import type { Subject } from "@/types/topic-package";
 import { deckTypeOrder } from "@/slides/structures";
 import { games } from "@/games/registry";
-import { deckTypeIcon, gameIcon } from "@/data/catalog";
+import { deckTypeIcon, docIcon, gameIcon } from "@/data/catalog";
+import { docKinds } from "@/types/documents";
 import { useT } from "@/i18n/client";
 import { SearchField } from "@/components/ui/SearchField";
 import { LucideIcon } from "@/components/ui/LucideIcon";
@@ -19,15 +20,19 @@ interface Item {
   text: string;
 }
 
-// Меню предмета: список «Презентация» (все виды) и список «Ойындар» (все игры).
+// Меню предмета: три списка — «Құжаттар» (ҚМЖ, тест, БЖБ), «Презентация» (все виды)
+// и «Ойындар» (все игры).
 // Каждый список — один белый лист со строками, как страница в тетради:
-// глазу спокойнее, чем от россыпи отдельных карточек. Поиск фильтрует оба.
+// глазу спокойнее, чем от россыпи отдельных карточек. Поиск фильтрует все три.
 export function SubjectMenu({ subject }: { subject: Subject }) {
   const t = useT();
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const match = (item: Item) => !q || `${item.title} ${item.text}`.toLowerCase().includes(q);
 
+  const docs = docKinds
+    .map((id) => ({ id, icon: docIcon[id], title: t.docs.kinds[id].name, text: t.docs.kinds[id].description }))
+    .filter(match);
   const decks = deckTypeOrder
     .map((id) => ({ id, icon: deckTypeIcon[id], title: t.deckTypes[id].name, text: t.deckTypes[id].description }))
     .filter(match);
@@ -53,7 +58,14 @@ export function SubjectMenu({ subject }: { subject: Subject }) {
         <SearchField value={query} onChange={setQuery} placeholder={t.subject.search} label={t.subject.searchLabel} />
       </div>
 
-      <div className="mt-8 grid items-start gap-8 lg:grid-cols-2">
+      <div className="mt-8 grid items-start gap-8 lg:grid-cols-2 xl:grid-cols-3">
+        {docs.length > 0 && (
+          <List title={t.docs.title} hint={t.docs.hint}>
+            {docs.map((item) => (
+              <Row key={item.id} item={item} href={`/subject/${subject}/${item.id}`} />
+            ))}
+          </List>
+        )}
         {decks.length > 0 && (
           <List title={t.subject.presentations} hint={t.subject.presentationsHint}>
             {decks.map((item) => (
@@ -69,7 +81,7 @@ export function SubjectMenu({ subject }: { subject: Subject }) {
           </List>
         )}
       </div>
-      {decks.length + gameItems.length === 0 && <p className="mt-10 text-body text-label-2">{t.home.nothing}</p>}
+      {docs.length + decks.length + gameItems.length === 0 && <p className="mt-10 text-body text-label-2">{t.home.nothing}</p>}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import type { GameId } from "@/games/registry";
+import type { DocKind } from "@/types/documents";
 import type { DeckType, Language, Subject } from "@/types/topic-package";
 
 // Тексты интерфейса на казахском. Это «эталон»: русский словарь (ru.ts)
@@ -110,14 +111,38 @@ export const kk = {
     gamesHint: "Проекторда немесе оқушылардың телефонынан",
     presentation: "Презентация",
     game: "Ойын",
+  },  docs: {
+    title: "Құжаттар",
+    hint: "Басып шығаруға немесе Word-та өңдеуге",
+    kinds: {
+      kmzh: { name: "ҚМЖ", description: "Қысқа мерзімді жоспар — ресми үлгі бойынша" },
+      test: { name: "Тест (басып шығаруға)", description: "15 сұрақ, жауап нұсқалары және жауап кілті" },
+      bzhb: { name: "БЖБ", description: "Бөлім бойынша жиынтық бағалау: тапсырмалар мен дескрипторлар" },
+    } satisfies Record<DocKind, { name: string; description: string }>,
+    document: "Құжат",
+    extra: "Құжаттағы деректер (міндетті емес)",
+    teacher: "Мұғалімнің аты-жөні",
+    school: "Мектеп",
+    date: "Күні",
+    modeEmpty: "Бос үлгі",
+    modeEmptyHint: "Тек кесте мен тақырыптар — қолмен толтырасыз",
+    modeAiHint: "Мазмұнын AI жазады, кейін Word-та түзетуге болады",
+    make: "Құжатты жасау",
+    working: "Жазып жатырмын… 10–20 секунд",
+    count: "Сұрақ саны",
+    word: "Word-қа жүктеу",
+    print: "PDF-ке сақтау немесе басып шығару",
+    preview: "Алдын ала көру",
+    previewHint: "Тақырыпты жазып, «Құжатты жасау» батырмасын басыңыз — мұнда толтырылған құжат шығады",
+    stale: "Тақырып немесе сынып өзгерді — жаңарту үшін «Құжатты жасау» батырмасын басыңыз",
   },
+
   form: {
     step1: "Сабақтың тақырыбын жазыңыз",
     topicLabel: "Сабақтың тақырыбы",
     voiceStop: "Тыңдауды тоқтату",
     voiceStart: "Дауыспен айту",
     listening: "Тыңдап тұрмын… тақырыпты айтыңыз",
-    examples: "Мысалы:",
     step2: "Пәнді таңдаңыз",
     subject: "Пән",
     step3: "Сынып пен тілді таңдаңыз",
@@ -133,7 +158,7 @@ export const kk = {
     makeSlides: "Дайын слайд жасау",
     makeGame: "Дайын ойын жасау",
     autosaved: "Барлығы автоматты түрде сақталады — бетті жауып қойсаңыз да жоғалмайды",
-    startHint: "Бастау үшін тақырыпты жазыңыз немесе мысалды басыңыз",
+    startHint: "Бастау үшін сабақтың тақырыбын жазыңыз",
     netError: "Байланыс үзілді. Интернетті тексеріп, қайталап көріңіз.",
     stepTopic: "Тақырып",
     stepSubject: "Пән мен сынып",
@@ -543,7 +568,7 @@ export const kk = {
     todayWeek: (today: number, limit: number | null, week: number) =>
       `бүгін ${today}${limit === null ? "" : ` / ${limit}`} · 7 күнде ${week}`,
     byKind: "Не жасалды",
-    kinds: { lesson: "Сабақ", deck: "Барлық слайд", part: "Бір бөлік", jeopardy: "Өз ойын" },
+    kinds: { lesson: "Сабақ", deck: "Барлық слайд", part: "Бір бөлік", jeopardy: "Өз ойын", document: "Құжат" },
     noErrors: "Қате жоқ — бәрі жақсы!",
     errorsHint: "AI сұраныстарындағы соңғы қателер. 429 — тегін шек бітті, 400 — сұраныс дұрыс емес.",
     statUsers: "Белсенді мұғалімдер",

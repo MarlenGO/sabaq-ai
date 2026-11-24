@@ -25,7 +25,7 @@ export default async function PastGamePage({ params }: PageProps<"/history/game/
   const when = dateTimeOf(room.createdAt);
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-24 pt-6">
+    <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-24 pt-6 sm:px-8">
       <Link href="/history" className="inline-flex items-center gap-1.5 text-subhead font-medium text-accent hover:opacity-70">
         <ArrowLeftIcon />
         {t.history.title}

@@ -11,7 +11,7 @@ import { hasAiKey } from "@/lib/ai/gemini";
 // только просмотр с кнопкой «Көшіріп алу».
 export default function LessonPage(props: PageProps<"/lesson/[id]">) {
   return (
-    <Suspense fallback={<div className="mx-auto mt-8 h-96 w-full max-w-5xl animate-pulse rounded-2xl bg-fill" />}>
+    <Suspense fallback={<div className="mx-auto mt-8 h-96 w-full max-w-7xl animate-pulse rounded-2xl bg-fill" />}>
       <Lesson {...props} />
     </Suspense>
   );

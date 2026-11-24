@@ -13,7 +13,8 @@ import {
 } from "@/types/topic-package";
 import { demoContent, emptyJeopardy, jeopardyFromPackage } from "@/lib/demo";
 import { generateJson, hasAiKey } from "./gemini";
-import { deckPrompt, jeopardyPrompt, packagePrompt, partPrompt, systemPrompt } from "./prompts";
+import { docSchemas, type DocData, type DocKind, type DocumentRequest } from "@/types/documents";
+import { deckPrompt, documentPrompt, jeopardyPrompt, packagePrompt, partPrompt, systemPrompt } from "./prompts";
 import { isDataSlide, structureOf, type DataSlide } from "@/slides/structures";
 
 // Что умеет «мозг» сайта. Без ключа — демо-режим, чтобы сайт работал и без AI.
@@ -66,4 +67,9 @@ export function generateDeck(pkg: TopicPackage): Promise<Record<string, Record<s
   return generateJson(schema, systemPrompt(pkg.language, pkg.grade), deckPrompt(pkg, slides)) as Promise<
     Record<string, Record<string, unknown>>
   >;
+}
+
+/** Документ (ҚМЖ, тест, БЖБ): AI пишет содержание по схеме вида документа */
+export function generateDocument(request: DocumentRequest): Promise<DocData[DocKind]> {
+  return generateJson(docSchemas[request.kind] as z.ZodType<DocData[DocKind]>, systemPrompt(request.language, request.grade), documentPrompt(request));
 }

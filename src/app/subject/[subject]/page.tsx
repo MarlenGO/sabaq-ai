@@ -11,7 +11,7 @@ export const generateStaticParams = () => subjectSchema.options.map((subject) =>
 
 export default function SubjectPage({ params }: PageProps<"/subject/[subject]">) {
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-6 sm:px-6">
+    <main className="mx-auto w-full max-w-[96rem] flex-1 px-4 pb-24 pt-6 sm:px-8">
       {/* Адрес страницы — «данные запроса», в Next.js 16 их читают внутри Suspense */}
       <Suspense fallback={<div className="h-96 animate-pulse rounded-2xl bg-fill" />}>
         <Menu params={params} />

@@ -18,7 +18,7 @@ function draw(pptx: PptxGenJS, slide: Slide, el: SlideElement, template: SlideTe
 
   if (el.type === "rect") {
     if (el.rounded === "full") {
-      slide.addShape(pptx.ShapeType.ellipse, { ...box, fill: { color: template.colors[el.fill] }, line: { type: "none" } });
+      slide.addShape(pptx.ShapeType.ellipse, { ...box, fill: { color: el.color ?? template.colors[el.fill] }, line: { type: "none" } });
       return;
     }
     // Радиус 10 пт как в превью. pptxgenjs принимает его долей от короткой стороны
@@ -26,7 +26,7 @@ function draw(pptx: PptxGenJS, slide: Slide, el: SlideElement, template: SlideTe
     const shortSidePt = Math.min((el.w / 100) * SLIDE_W_PT, (el.h / 100) * SLIDE_H_PT);
     slide.addShape(el.rounded ? pptx.ShapeType.roundRect : pptx.ShapeType.rect, {
       ...box,
-      fill: { color: template.colors[el.fill] },
+      fill: { color: el.color ?? template.colors[el.fill] },
       line: { type: "none" },
       rectRadius: el.rounded ? Math.min(0.5, 10 / shortSidePt) : undefined,
     });
@@ -115,7 +115,7 @@ export async function buildPptx(
   pptx.layout = "LAYOUT_16x9";
   pptx.title = pkg.topic;
 
-  const t = template ?? getTemplate(pkg.templateId, pkg.subject);
+  const t = template ?? getTemplate(pkg.templateId, pkg.subject, pkg.deckType);
   const slides = buildSlides(pkg, t);
 
   // Каждую иконку каждого цвета превращаем в PNG один раз

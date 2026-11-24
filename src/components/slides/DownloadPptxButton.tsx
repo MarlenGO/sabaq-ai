@@ -17,7 +17,7 @@ export function DownloadPptxButton({ pkg }: { pkg: TopicPackage }) {
     try {
       await exportPptx(pkg);
       setState("done");
-      track({ type: "pptx", lessonId: pkg.id, templateId: getTemplate(pkg.templateId, pkg.subject).id });
+      track({ type: "pptx", lessonId: pkg.id, templateId: getTemplate(pkg.templateId, pkg.subject, pkg.deckType).id });
     } catch (error) {
       console.error(error);
       setState("error");

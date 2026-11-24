@@ -8,7 +8,7 @@ import type { User } from "@/lib/auth";
 /** Сколько генераций в день у учителя, если админ не задал своё число */
 export const DEFAULT_DAILY_LIMIT = 40;
 
-export type UsageKind = "lesson" | "deck" | "part" | "jeopardy";
+export type UsageKind = "lesson" | "deck" | "part" | "jeopardy" | "document";
 
 /** Начало сегодняшнего дня по времени Казахстана (UTC+5) */
 export function startOfToday() {

@@ -6,7 +6,7 @@ import { SubjectGrid } from "@/components/home/SubjectGrid";
 // Создание начинается со страницы предмета (/subject/[предмет]).
 export default function Home() {
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-8 sm:px-6">
+    <main className="mx-auto w-full max-w-[96rem] flex-1 px-4 pb-24 pt-8 sm:px-8">
       <SubjectGrid />
       <Suspense>
         <RecentLessons />

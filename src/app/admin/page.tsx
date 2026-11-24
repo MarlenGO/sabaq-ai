@@ -19,7 +19,7 @@ type T = Awaited<ReturnType<typeof getT>>;
 export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   const t = await getT();
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-24 pt-8">
+    <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-24 pt-8 sm:px-8">
       <title>{t.admin.title}</title>
       <h1 className="text-large font-bold tracking-tight">{t.admin.title}</h1>
       <Suspense fallback={<div className="mt-6 h-96 animate-pulse rounded-2xl bg-fill" />}>

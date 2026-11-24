@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 import type { Language, Subject } from "@/types/topic-package";
-import { deckTypeIcon, exampleTopics, gameIcon, type CreateKind } from "@/data/catalog";
+import { deckTypeIcon, gameIcon, type CreateKind } from "@/data/catalog";
 import { useT } from "@/i18n/client";
 import { useStoredState } from "@/lib/stored-state";
 import { useVoiceInput } from "@/lib/voice-input";
@@ -25,15 +25,18 @@ interface Draft {
 }
 
 const emptyDraft: Draft = { topic: "", grade: 7, language: "kk", mode: "ai" };
-const grades = Array.from({ length: 11 }, (_, i) => i + 1);
+/** Классы 6–11: сайт для средней и старшей школы, все помещаются в одну строку */
+const grades = [6, 7, 8, 9, 10, 11];
 
 // Одна простая форма: тема, язык, класс, «AI или пусто». Предмет и вид
 // выбраны на прошлых страницах. Всё введённое сохраняется само (useStoredState).
-export function CreateForm({ subject, kind }: { subject: Subject; kind: CreateKind }) {
+export function CreateForm({ subject, kind }: { subject: Subject; kind: Exclude<CreateKind, { type: "doc" }> }) {
   const router = useRouter();
   const t = useT();
   const [stored, setDraft] = useStoredState("sabaq-create", emptyDraft);
-  const draft: Draft = { ...emptyDraft, ...stored };
+  const merged: Draft = { ...emptyDraft, ...stored };
+  // В старых черновиках мог остаться класс 1–5 — их больше нет в списке
+  const draft: Draft = { ...merged, grade: grades.includes(merged.grade) ? merged.grade : 7 };
   // useTransition, а не флаг loading: страница остаётся жить после перехода на урок
   const [loading, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +106,6 @@ export function CreateForm({ subject, kind }: { subject: Subject; kind: CreateKi
               <input
                 value={draft.topic}
                 onChange={(e) => update({ topic: e.target.value })}
-                placeholder={exampleTopics[subject][draft.language][0]}
                 aria-label={t.form.topicLabel}
                 className="h-14 w-full rounded-2xl bg-fill pl-5 pr-16 text-body outline-none placeholder:text-label-3 focus:ring-4 focus:ring-accent/25"
               />
@@ -122,19 +124,6 @@ export function CreateForm({ subject, kind }: { subject: Subject; kind: CreateKi
               )}
             </div>
             {voice.listening && <p className="mt-2 text-subhead text-red">{t.form.listening}</p>}
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="text-footnote text-label-2">{t.form.examples}</span>
-              {exampleTopics[subject][draft.language].map((topic) => (
-                <button
-                  key={topic}
-                  type="button"
-                  onClick={() => update({ topic })}
-                  className="rounded-full bg-fill px-3.5 py-1.5 text-footnote font-medium text-label transition hover:bg-accent/15"
-                >
-                  {topic}
-                </button>
-              ))}
-            </div>
           </Field>
 
           <Field title={t.form.contentLanguage}>
@@ -151,7 +140,7 @@ export function CreateForm({ subject, kind }: { subject: Subject; kind: CreateKi
           </Field>
 
           <Field title={t.form.gradeLabel}>
-            <div role="radiogroup" aria-label={t.form.gradeLabel} className="grid grid-cols-6 gap-2 sm:grid-cols-11">
+            <div role="radiogroup" aria-label={t.form.gradeLabel} className="grid grid-cols-6 gap-2">
               {grades.map((grade) => (
                 <button
                   key={grade}
@@ -170,24 +159,20 @@ export function CreateForm({ subject, kind }: { subject: Subject; kind: CreateKi
             </div>
           </Field>
 
-          <Field title={t.form.contentMode}>
-            <div role="radiogroup" aria-label={t.form.contentMode} className="grid gap-3 sm:grid-cols-2">
+          <div role="radiogroup" aria-label={t.form.contentMode} className="grid grid-cols-2 gap-3">
               <ModeTile
                 selected={draft.mode === "ai"}
                 onSelect={() => update({ mode: "ai" })}
                 icon={<SparkleIcon />}
                 title={t.form.modeAi}
-                text={t.form.modeAiHint}
               />
               <ModeTile
                 selected={draft.mode === "empty"}
                 onSelect={() => update({ mode: "empty" })}
                 icon={<PencilIcon />}
                 title={t.form.modeEmpty}
-                text={t.form.modeEmptyHint}
               />
             </div>
-          </Field>
 
           <div className="flex flex-col gap-3">
             <Button type="submit" size="lg" disabled={!hasTopic || loading}>
@@ -224,21 +209,20 @@ function Field({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function ModeTile(props: { selected: boolean; onSelect: () => void; icon: ReactNode; title: string; text: string }) {
+function ModeTile(props: { selected: boolean; onSelect: () => void; icon: ReactNode; title: string }) {
   return (
     <button
       type="button"
       role="radio"
       aria-checked={props.selected}
       onClick={props.onSelect}
-      className={`flex items-start gap-3 rounded-2xl border-2 p-4 text-left transition ${
+      className={`flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition ${
         props.selected ? "border-accent bg-accent/6" : "border-transparent bg-fill hover:border-separator"
       }`}
     >
-      <span className={`mt-0.5 ${props.selected ? "text-accent" : "text-label-2"}`}>{props.icon}</span>
+      <span className={`${props.selected ? "text-accent" : "text-label-2"}`}>{props.icon}</span>
       <span>
         <span className="block text-body font-semibold">{props.title}</span>
-        <span className="mt-0.5 block text-footnote text-label-2">{props.text}</span>
       </span>
     </button>
   );

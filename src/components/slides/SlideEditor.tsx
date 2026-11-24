@@ -18,7 +18,7 @@ import type { AiPart } from "@/types/ai";
 // маленькие слайды, справа выбранный слайд крупно и поля именно этого слайда.
 export function SlideEditor({ pkg, onChange }: { pkg: TopicPackage; onChange: (pkg: TopicPackage) => void }) {
   const t = useT();
-  const template = getTemplate(pkg.templateId, pkg.subject);
+  const template = getTemplate(pkg.templateId, pkg.subject, pkg.deckType);
   const slides = buildSlides(pkg, template);
   const [selected, setSelected] = useState(0);
   // Если факты удалили и слайдов стало меньше — остаёмся на последнем

@@ -27,7 +27,7 @@ export function SubjectGrid() {
       {shown.length === 0 ? (
         <p className="mt-10 text-body text-label-2">{t.home.nothing}</p>
       ) : (
-        <ul className="mt-7 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+        <ul className="mt-7 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {shown.map((subject) => (
             <li key={subject}>
               <Link

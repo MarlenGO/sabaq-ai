@@ -20,7 +20,7 @@ function Element({ el, template }: { el: SlideElement; template: SlideTemplate }
       <div
         style={{
           ...boxStyle(el),
-          background: hex(template.colors[el.fill]),
+          background: hex(el.color ?? template.colors[el.fill]),
           borderRadius: el.rounded === "full" ? "50%" : el.rounded ? pt(10) : undefined,
         }}
       />

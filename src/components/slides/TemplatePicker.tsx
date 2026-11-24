@@ -27,11 +27,10 @@ export function TemplatePicker({ pkg, value, onChange }: { pkg: TopicPackage; va
             }`}
           >
             <SlideCanvas slide={titleSlide} template={template} />
-            <span className="mt-1.5 flex items-center gap-1 px-1 text-subhead font-semibold">
+            <span className="mt-1.5 flex items-center gap-1 px-1 pb-1 text-subhead font-semibold">
               {selected && <CheckIcon className="text-accent" />}
               {t.templates[template.id]?.name ?? template.name}
             </span>
-            <span className="block px-1 pb-1 text-caption text-label-2">{t.templates[template.id]?.description ?? template.description}</span>
           </button>
         );
       })}

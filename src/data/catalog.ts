@@ -4,6 +4,7 @@ import {
   BookA,
   BookOpenText,
   CircleCheck,
+  ClipboardCheck,
   ClipboardList,
   Dna,
   Earth,
@@ -14,7 +15,9 @@ import {
   Landmark,
   Languages,
   ListChecks,
+  ListTodo,
   Megaphone,
+  NotebookPen,
   Monitor,
   Presentation,
   School,
@@ -24,8 +27,9 @@ import {
   Users,
   Zap,
 } from "lucide-static";
-import type { DeckType, Language, Subject } from "@/types/topic-package";
+import type { DeckType, Subject } from "@/types/topic-package";
 import type { GameId } from "@/games/registry";
+import { docKinds, type DocKind } from "@/types/documents";
 import { deckTypeOrder } from "@/slides/structures";
 import { games } from "@/games/registry";
 
@@ -69,27 +73,21 @@ export const gameIcon: Record<GameId, string> = {
   race: Zap,
 };
 
-/** Что можно создать: вид презентации или игра. Адрес — /subject/<предмет>/<id> */
-export type CreateKind = { type: "deck"; id: DeckType } | { type: "game"; id: GameId };
+export const docIcon: Record<DocKind, string> = {
+  kmzh: NotebookPen,
+  test: ListTodo,
+  bzhb: ClipboardCheck,
+};
+
+/** Что можно создать: документ, вид презентации или игра. Адрес — /subject/<предмет>/<id> */
+export type CreateKind = { type: "doc"; id: DocKind } | { type: "deck"; id: DeckType } | { type: "game"; id: GameId };
+
+/** Все id для адресов страниц создания (id видов, игр и документов не пересекаются) */
+export const createKindIds: string[] = [...docKinds, ...deckTypeOrder, ...games.map((g) => g.id)];
 
 export function kindOf(id: string): CreateKind | null {
+  if ((docKinds as string[]).includes(id)) return { type: "doc", id: id as DocKind };
   if ((deckTypeOrder as string[]).includes(id)) return { type: "deck", id: id as DeckType };
   if (games.some((g) => g.id === id)) return { type: "game", id: id as GameId };
   return null;
 }
-
-/** Примеры тем по предмету: кнопки под полем «Тақырып» */
-export const exampleTopics: Record<Subject, Record<Language, string[]>> = {
-  physics: { kk: ["Ньютонның бірінші заңы", "Ом заңы", "Жарықтың сынуы"], ru: ["Первый закон Ньютона", "Закон Ома", "Преломление света"] },
-  math: { kk: ["Пифагор теоремасы", "Квадрат теңдеулер", "Бөлшектер"], ru: ["Теорема Пифагора", "Квадратные уравнения", "Дроби"] },
-  informatics: { kk: ["Алгоритм түрлері", "Python-да циклдар", "Компьютер құрылғылары"], ru: ["Виды алгоритмов", "Циклы в Python", "Устройство компьютера"] },
-  chemistry: { kk: ["Периодтық жүйе", "Химиялық реакциялар", "Қышқылдар мен негіздер"], ru: ["Периодическая система", "Химические реакции", "Кислоты и основания"] },
-  biology: { kk: ["Фотосинтез", "Жасуша құрылысы", "Қан айналым жүйесі"], ru: ["Фотосинтез", "Строение клетки", "Кровеносная система"] },
-  geography: { kk: ["Қазақстанның өзендері", "Климат белдеулері", "Жер қыртысы"], ru: ["Реки Казахстана", "Климатические пояса", "Земная кора"] },
-  history: { kk: ["Қазақ хандығының құрылуы", "Ұлы Жібек жолы", "Екінші дүниежүзілік соғыс"], ru: ["Образование Казахского ханства", "Великий Шёлковый путь", "Вторая мировая война"] },
-  kazakh: { kk: ["Зат есім", "Етістік шақтары", "Сөз таптары"], ru: ["Имя существительное", "Времена глагола", "Части речи"] },
-  russian: { kk: ["Зат есім", "Сын есім", "Тыныс белгілері"], ru: ["Имя существительное", "Имя прилагательное", "Знаки препинания"] },
-  literature: { kk: ["Абай Құнанбайұлы", "Мағжан Жұмабаев", "Шоқан Уәлиханов"], ru: ["Абай Кунанбаев", "А. С. Пушкин", "Л. Н. Толстой"] },
-  english: { kk: ["Present Simple", "My family", "Past Simple"], ru: ["Present Simple", "My family", "Past Simple"] },
-  other: { kk: ["Отбасы құндылықтары", "Жол ережесі", "Салауатты өмір салты"], ru: ["Семейные ценности", "Правила дорожного движения", "Здоровый образ жизни"] },
-};

@@ -77,7 +77,7 @@ export function LessonWorkspace({ initial, tab, readOnly, copyable, game, aiEnab
   };
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-24 pt-6">
+    <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-24 pt-6 sm:px-8">
       <Link
         href={readOnly ? "/history" : "/"}
         className="inline-flex items-center gap-1.5 text-subhead font-medium text-accent hover:opacity-70"
@@ -176,7 +176,7 @@ export function LessonWorkspace({ initial, tab, readOnly, copyable, game, aiEnab
                       <h2 className="mb-3 text-title3 font-semibold">{t.lesson.chooseTemplate}</h2>
                       <TemplatePicker
                         pkg={lesson}
-                        value={getTemplate(lesson.templateId, lesson.subject).id}
+                        value={getTemplate(lesson.templateId, lesson.subject, lesson.deckType).id}
                         onChange={(templateId) => update({ ...lesson, templateId })}
                       />
                     </section>

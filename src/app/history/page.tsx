@@ -9,7 +9,7 @@ import { requireUser } from "@/lib/auth";
 export default async function HistoryPage() {
   const t = await getT();
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-24 pt-8">
+    <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-24 pt-8 sm:px-8">
       <title>{t.meta.history}</title>
       <h1 className="text-large font-bold tracking-tight">{t.history.title}</h1>
       <p className="mt-1 text-subhead text-label-2">{t.history.subtitle}</p>

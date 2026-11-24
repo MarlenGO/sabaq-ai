@@ -50,25 +50,31 @@ export async function generateJson<T>(schema: z.ZodType<T>, system: string, prom
   if (!key) throw new AiError("no_key", "GEMINI_API_KEY не задан в .env.local");
   const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
 
+  const send = () =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseJsonSchema: toGeminiSchema(schema),
+          temperature: 0.4,
+        },
+      }),
+      signal: AbortSignal.timeout(90_000),
+    }).catch(() => null);
+
   // Одна повторная попытка: изредка модель отвечает не по схеме
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseJsonSchema: toGeminiSchema(schema),
-            temperature: 0.4,
-          },
-        }),
-        signal: AbortSignal.timeout(60_000),
-      },
-    ).catch(() => null);
+    let response = await send();
+    // 503/500 — у Google перегрузка, обычно на несколько секунд: пробуем ещё дважды с паузой
+    for (const pause of [3_000, 8_000]) {
+      if (!response || (response.status !== 503 && response.status !== 500)) break;
+      await new Promise((resolve) => setTimeout(resolve, pause));
+      response = await send();
+    }
 
     if (!response) throw new AiError("unavailable", "Gemini не ответил");
     if (response.status === 429) throw new AiError("rate_limit", "Лимит бесплатных запросов Gemini");

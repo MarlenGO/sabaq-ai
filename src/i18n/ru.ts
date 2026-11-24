@@ -1,3 +1,4 @@
+import type { DocKind } from "@/types/documents";
 import type { Messages } from "./kk";
 
 // Тексты интерфейса на русском. Ключи — те же, что в kk.ts.
@@ -105,14 +106,38 @@ export const ru: Messages = {
     gamesHint: "На проекторе или с телефонов учеников",
     presentation: "Презентация",
     game: "Игра",
+  },  docs: {
+    title: "Документы",
+    hint: "Для печати или правки в Word",
+    kinds: {
+      kmzh: { name: "КСП (ҚМЖ)", description: "Краткосрочный план по официальной форме" },
+      test: { name: "Тест (для печати)", description: "15 вопросов, варианты ответов и ключ" },
+      bzhb: { name: "СОР (БЖБ)", description: "Суммативное оценивание за раздел: задания и дескрипторы" },
+    } satisfies Record<DocKind, { name: string; description: string }>,
+    document: "Документ",
+    extra: "Данные в документе (необязательно)",
+    teacher: "ФИО учителя",
+    school: "Школа",
+    date: "Дата",
+    modeEmpty: "Пустой бланк",
+    modeEmptyHint: "Только таблицы и заголовки — заполните от руки",
+    modeAiHint: "Содержание напишет AI, потом можно поправить в Word",
+    make: "Создать документ",
+    working: "Пишу… 10–20 секунд",
+    count: "Количество вопросов",
+    word: "Скачать в Word",
+    print: "Сохранить в PDF или напечатать",
+    preview: "Предпросмотр",
+    previewHint: "Напишите тему и нажмите «Создать документ» — здесь появится заполненный документ",
+    stale: "Тема или класс изменились — нажмите «Создать документ», чтобы обновить",
   },
+
   form: {
     step1: "Напишите тему урока",
     topicLabel: "Тема урока",
     voiceStop: "Остановить запись",
     voiceStart: "Сказать голосом",
     listening: "Слушаю… скажите тему",
-    examples: "Например:",
     step2: "Выберите предмет",
     subject: "Предмет",
     step3: "Выберите класс и язык урока",
@@ -128,7 +153,7 @@ export const ru: Messages = {
     makeSlides: "Создать слайды",
     makeGame: "Создать игру",
     autosaved: "Всё сохраняется автоматически — даже если закрыть страницу",
-    startHint: "Чтобы начать, напишите тему или нажмите на пример",
+    startHint: "Чтобы начать, напишите тему урока",
     netError: "Нет связи. Проверьте интернет и попробуйте ещё раз.",
     stepTopic: "Тема",
     stepSubject: "Предмет и класс",
@@ -537,7 +562,7 @@ export const ru: Messages = {
     nothingYet: "Пока ничего нет",
     todayWeek: (today, limit, week) => `сегодня ${today}${limit === null ? "" : ` / ${limit}`} · за 7 дней ${week}`,
     byKind: "Что создавали",
-    kinds: { lesson: "Урок", deck: "Все слайды", part: "Одна часть", jeopardy: "Своя игра" },
+    kinds: { lesson: "Урок", deck: "Все слайды", part: "Одна часть", jeopardy: "Своя игра", document: "Документ" },
     noErrors: "Ошибок нет — всё хорошо!",
     errorsHint: "Последние ошибки запросов к AI. 429 — закончился бесплатный лимит, 400 — неверный запрос.",
     statUsers: "Активные учителя",

@@ -2,6 +2,10 @@ import type { Language, LayoutKind, TopicPackage } from "@/types/topic-package";
 import type { IconName } from "./icons";
 import { isDataSlide, slideData, structureOf, type ContentKind, type DataSlide } from "./structures";
 import type { SlideTemplate } from "./templates";
+import { fitFontSize, sq, type Box, type ColorRole, type SlideElement } from "./elements";
+import { designOf } from "./designs";
+
+export { SLIDE_W_PT, SLIDE_H_PT, fitFontSize, type SlideElement } from "./elements";
 
 // Раскладка слайдов — одна на превью и на PPTX.
 // buildSlides превращает пакет темы в список слайдов из простых элементов
@@ -13,43 +17,6 @@ import type { SlideTemplate } from "./templates";
 // Какие слайды и в каком порядке — решает вид презентации (structures.ts):
 // слайды с содержанием темы из пакета и слайды-заготовки (цели, план, таблица…),
 // тексты которых учитель правит в конструкторе (pkg.deck). Здесь только раскладки.
-
-/** Слайд 16:9 в PowerPoint — 10 × 5,625 дюйма, то есть 720 × 405 пунктов */
-export const SLIDE_W_PT = 720;
-export const SLIDE_H_PT = 405;
-
-type ColorRole = keyof SlideTemplate["colors"];
-
-interface Box {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-export type SlideElement =
-  /** rounded: true — скруглённые углы, "full" — круг/овал */
-  | (Box & { type: "rect"; fill: ColorRole; rounded?: boolean | "full" })
-  | (Box & { type: "circle"; color: string; transparency: number })
-  | (Box & { type: "icon"; name: IconName; color: ColorRole })
-  /**
-   * Картинка. С src — настоящее фото (из Wikimedia, с подписью автора credit).
-   * Без src — место под картинку: в PowerPoint учитель нажимает на значок и выбирает фото.
-   */
-  | (Box & { type: "image"; label: string; prompt: string; src?: string; credit?: string })
-  | (Box & {
-      type: "text";
-      /** Один абзац или несколько (массив) */
-      text: string | string[];
-      /** Маркеры списка перед абзацами */
-      bullet?: boolean;
-      fontSize: number;
-      color: ColorRole;
-      font: "heading" | "body";
-      bold?: boolean;
-      align?: "left" | "center";
-      valign?: "top" | "middle" | "bottom";
-    });
 
 /** Раскладка слайда: заготовки (LayoutKind) и слайды с содержанием темы */
 export type SlideKind = LayoutKind | ContentKind;
@@ -81,38 +48,11 @@ const copy = {
   },
 } satisfies Record<Language, unknown>;
 
-// Подбор размера шрифта: грубо оцениваем, сколько строк займёт текст в рамке,
-// и уменьшаем шрифт, пока не влезет. Средний символ ≈ 0,55 от размера шрифта.
-export function fitFontSize(text: string | string[], box: { w: number; h: number }, max: number, min: number) {
-  const paragraphs = Array.isArray(text) ? text : [text];
-  const widthPt = (box.w / 100) * SLIDE_W_PT;
-  const heightPt = (box.h / 100) * SLIDE_H_PT;
-  for (let size = max; size > min; size--) {
-    const charsPerLine = Math.max(1, Math.floor(widthPt / (size * 0.55)));
-    const lines = paragraphs.reduce((sum, p) => sum + Math.max(1, Math.ceil(p.length / charsPerLine)), 0);
-    const gaps = (paragraphs.length - 1) * size * 0.5;
-    if (lines * size * 1.2 + gaps <= heightPt) return size;
-  }
-  return min;
-}
-
 const chunk = <T>(items: T[], size: number) =>
   Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, i * size + size));
 
-/** Высота в % для квадрата шириной w % (слайд 16:9) */
-const sq = (w: number) => (w * SLIDE_W_PT) / SLIDE_H_PT;
-
-function decor(template: SlideTemplate): SlideElement[] {
-  if (!template.decor) return [];
-  const { color, transparency } = template.decor;
-  return [
-    { type: "circle", x: 78, y: -30, w: 34, h: 60, color, transparency },
-    { type: "circle", x: 88, y: 18, w: 18, h: 32, color, transparency },
-  ];
-}
-
 function heading(value: string, w = 80): SlideElement {
-  return { type: "text", x: 6, y: 7, w, h: 13, text: value, fontSize: fitFontSize(value, { w, h: 13 }, 30, 20), color: "accent", font: "heading", bold: true, valign: "middle" };
+  return { type: "text", x: 6, y: 7, w, h: 13, text: value, fontSize: fitFontSize(value, { w, h: 13 }, 30, 20), color: "accent", font: "heading", bold: true, valign: "middle", role: "heading" };
 }
 
 function text(box: Box, value: string | string[], max: number, min: number, extra: Partial<SlideElement> = {}): SlideElement {
@@ -147,14 +87,29 @@ const one = (title: string, elements: SlideElement[], withDecor = true): Pages =
 
 export function buildSlides(pkg: TopicPackage, template: SlideTemplate): Slide[] {
   const l = copy[pkg.language];
-  return structureOf(pkg).flatMap((spec) => {
-    const pages = isDataSlide(spec) ? dataPages(spec, pkg, l) : contentPages(spec.kind as ContentKind, pkg, l);
-    return pages.map((page) => ({
-      id: spec.id,
-      kind: spec.kind,
-      title: page.title,
-      elements: page.decor === false ? page.elements : [...decor(template), ...page.elements],
-    }));
+  // Вид презентации решает и набор слайдов (structures.ts), и оформление (designs.ts)
+  const design = designOf(pkg.deckType);
+  const pages = structureOf(pkg).flatMap((spec) => {
+    const list = isDataSlide(spec) ? dataPages(spec, pkg, l, template) : contentPages(spec.kind as ContentKind, pkg, l);
+    return list.map((page) => ({ spec, page }));
+  });
+  return pages.map(({ spec, page }, i): Slide => {
+    const base = { id: spec.id, kind: spec.kind, title: page.title };
+    // Титульный слайд вид рисует целиком сам
+    if (spec.kind === "title") return { ...base, elements: page.elements };
+    const isHeading = (el: SlideElement) => el.type === "text" && el.role === "heading";
+    const frame = design.frame(template, {
+      n: i + 1,
+      topic: pkg.topic,
+      full: page.decor !== false,
+      hasHeading: page.elements.some(isHeading),
+    });
+    const elements = page.elements.flatMap((el) => {
+      if (el.type !== "text" || el.role !== "heading" || !design.heading) return [el];
+      const extra = design.heading(el, template);
+      return [...(extra.before ?? []), el, ...(extra.after ?? [])];
+    });
+    return { ...base, elements: [...frame, ...elements] };
   });
 }
 
@@ -237,7 +192,7 @@ function bulletList(title: string, lines: string[]): SlideElement[] {
 
 // ——— Слайды-заготовки ———
 
-function dataPages(spec: DataSlide, pkg: TopicPackage, l: Copy): Pages {
+function dataPages(spec: DataSlide, pkg: TopicPackage, l: Copy, template: SlideTemplate): Pages {
   // switch по spec.kind сужает тип, поэтому slideData отдаёт данные именно этой раскладки
   const data = <K extends LayoutKind>(s: Extract<DataSlide, { kind: K }>) => slideData<K>(pkg, s);
   const icon = (i: number, fallback: IconName): IconName => spec.icons?.[i] ?? fallback;
@@ -245,13 +200,8 @@ function dataPages(spec: DataSlide, pkg: TopicPackage, l: Copy): Pages {
   switch (spec.kind) {
     case "title": {
       const d = data(spec);
-      const elements: SlideElement[] = [
-        { type: "rect", x: 6, y: 22, w: 10, h: 2, fill: "accent" },
-        { type: "text", x: 6, y: 12, w: 70, h: 9, text: d.kicker.toUpperCase(), fontSize: 16, color: "muted", font: "body", bold: true, valign: "bottom" },
-        text({ x: 6, y: 30, w: 80, h: 40 }, pkg.topic, 54, 26, { font: "heading", bold: true, valign: "middle" }),
-      ];
-      if (d.author.trim()) elements.push(text({ x: 6, y: 78, w: 70, h: 10 }, d.author, 18, 12, { color: "muted", valign: "middle" }));
-      return one(pkg.topic, elements);
+      const info = { topic: pkg.topic, kicker: d.kicker, author: d.author, language: pkg.language };
+      return one(pkg.topic, designOf(pkg.deckType).title(template, info));
     }
 
     // Три карточки с иконками: цели, методы, достижения
