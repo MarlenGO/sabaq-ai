@@ -9,65 +9,65 @@
   на <html>, и это перекрывает системную настройку.
 */
 :root {
-  --bg: #f5f5f7;
+  --bg: #eef1eb;
   --surface: #ffffff;
-  --glass: rgb(255 255 255 / 0.72);
-  --label: #1d1d1f;
-  --label-2: #6e6e73;
-  --label-3: #aeaeb2;
-  --separator: rgb(60 60 67 / 0.14);
-  --fill: rgb(118 118 128 / 0.12);
-  --accent: #007aff;
-  --accent-pressed: #0062cc;
-  --indigo: #5856d6;
-  --purple: #af52de;
-  --teal: #30b0c7;
-  --orange: #ff9500;
-  --green: #34c759;
-  --red: #ff3b30;
-  --shadow: 0 1px 3px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.05);
+  --glass: rgb(238 241 235 / 0.82);
+  --label: #1f2a24;
+  --label-2: #5d6a62;
+  --label-3: #9aa59e;
+  --separator: rgb(31 42 36 / 0.1);
+  --fill: rgb(31 42 36 / 0.06);
+  --accent: #2e6a4f;
+  --accent-pressed: #24553f;
+  --indigo: #4f5bb3;
+  --purple: #8a5bb0;
+  --teal: #2f8a8a;
+  --orange: #c9822b;
+  --green: #3f8f4e;
+  --red: #c4483e;
+  --shadow: 0 0 0 1px rgb(31 42 36 / 0.06);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #000000;
-    --surface: #1c1c1e;
-    --glass: rgb(28 28 30 / 0.72);
-    --label: #f5f5f7;
-    --label-2: #98989d;
-    --label-3: #636366;
-    --separator: rgb(84 84 88 / 0.6);
-    --fill: rgb(118 118 128 / 0.24);
-    --accent: #0a84ff;
-    --accent-pressed: #409cff;
-    --indigo: #5e5ce6;
-    --purple: #bf5af2;
-    --teal: #40c8e0;
-    --orange: #ff9f0a;
-    --green: #30d158;
-    --red: #ff453a;
-    --shadow: 0 0 0 1px rgb(255 255 255 / 0.06);
+    --bg: #161b18;
+    --surface: #1f2622;
+    --glass: rgb(22 27 24 / 0.82);
+    --label: #e8ece8;
+    --label-2: #a3aea7;
+    --label-3: #6b766f;
+    --separator: rgb(232 236 232 / 0.1);
+    --fill: rgb(232 236 232 / 0.07);
+    --accent: #6fbf95;
+    --accent-pressed: #8ccfab;
+    --indigo: #8f98e0;
+    --purple: #b892d6;
+    --teal: #6cc0bf;
+    --orange: #e0a65c;
+    --green: #74c283;
+    --red: #e57d73;
+    --shadow: 0 0 0 1px rgb(232 236 232 / 0.06);
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #000000;
-  --surface: #1c1c1e;
-  --glass: rgb(28 28 30 / 0.72);
-  --label: #f5f5f7;
-  --label-2: #98989d;
-  --label-3: #636366;
-  --separator: rgb(84 84 88 / 0.6);
-  --fill: rgb(118 118 128 / 0.24);
-  --accent: #0a84ff;
-  --accent-pressed: #409cff;
-  --indigo: #5e5ce6;
-  --purple: #bf5af2;
-  --teal: #40c8e0;
-  --orange: #ff9f0a;
-  --green: #30d158;
-  --red: #ff453a;
-  --shadow: 0 0 0 1px rgb(255 255 255 / 0.06);
+  --bg: #161b18;
+  --surface: #1f2622;
+  --glass: rgb(22 27 24 / 0.82);
+  --label: #e8ece8;
+  --label-2: #a3aea7;
+  --label-3: #6b766f;
+  --separator: rgb(232 236 232 / 0.1);
+  --fill: rgb(232 236 232 / 0.07);
+  --accent: #6fbf95;
+  --accent-pressed: #8ccfab;
+  --indigo: #8f98e0;
+  --purple: #b892d6;
+  --teal: #6cc0bf;
+  --orange: #e0a65c;
+  --green: #74c283;
+  --red: #e57d73;
+  --shadow: 0 0 0 1px rgb(232 236 232 / 0.06);
 }
 
 @theme inline {
@@ -89,9 +89,8 @@
   --color-red: var(--red);
   --shadow-card: var(--shadow);
 
-  /* На Mac и iPhone браузер возьмёт системный SF Pro, на Windows и Android — Inter */
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-    var(--font-inter), "Segoe UI", system-ui, sans-serif;
+  /* Nunito — округлый, спокойный шрифт со всеми казахскими буквами; одинаков на всех устройствах */
+  --font-sans: var(--font-nunito), "Segoe UI", system-ui, sans-serif;
 }
 
 /*

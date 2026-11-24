@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
 import { Suspense, type ReactNode } from "react";
-import { Inter } from "next/font/google";
+import { Nunito } from "next/font/google";
 import { getLocale } from "@/i18n/server";
 import { LocaleProvider } from "@/i18n/client";
 import { NavBar } from "@/components/ui/NavBar";
 import { preferencesScript } from "@/lib/preferences-script";
 import "./globals.css";
 
-// Запасной шрифт для устройств без SF Pro (Windows, Android).
+// Шрифт сайта — Nunito: округлый и мягкий, легко читается.
 // cyrillic-ext нужен для казахских букв ә, ғ, қ, ң, ө, ұ, ү, һ, і.
-const inter = Inter({
-  variable: "--font-inter",
+const nunito = Nunito({
+  variable: "--font-nunito",
   subsets: ["latin", "cyrillic", "cyrillic-ext"],
 });
 
@@ -23,7 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     // suppressHydrationWarning: скрипт ниже меняет атрибуты <html> до React,
     // и это ожидаемое расхождение с серверной версией
-    <html lang="kk" className={`${inter.variable} h-full`} suppressHydrationWarning>
+    <html lang="kk" className={`${nunito.variable} h-full`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: preferencesScript }} />
       </head>
@@ -41,8 +41,11 @@ async function WithLocale({ children }: { children: ReactNode }) {
   const locale = await getLocale();
   return (
     <LocaleProvider locale={locale}>
-      <NavBar />
-      {children}
+      {/* На компьютере меню слева закреплено, поэтому содержимое сдвинуто вправо на его ширину */}
+      <div className="flex flex-1 flex-col lg:pl-64">
+        <NavBar />
+        {children}
+      </div>
     </LocaleProvider>
   );
 }
