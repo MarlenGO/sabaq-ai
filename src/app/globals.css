@@ -116,7 +116,8 @@
 
 html {
   color-scheme: light;
-  font-size: 100%;
+  /* Весь сайт чуть мельче, как масштаб браузера 80%: размеры и отступы в rem */
+  font-size: 80%;
 }
 @media (prefers-color-scheme: dark) {
   html:not([data-theme="light"]) {
@@ -127,10 +128,10 @@ html[data-theme="dark"] {
   color-scheme: dark;
 }
 html[data-text-size="l"] {
-  font-size: 112.5%;
+  font-size: 90%;
 }
 html[data-text-size="xl"] {
-  font-size: 125%;
+  font-size: 100%;
 }
 
 body {

@@ -130,7 +130,7 @@ function Row({ entry }: { entry: HistoryEntry }) {
     tint = "bg-teal";
     title = t.history.documentMade(t.docs.kinds[entry.docKind].name);
     detail = `${t.subjects[entry.subject]} · ${t.common.grade(entry.grade)}`;
-    const query = new URLSearchParams({ topic: entry.topic, grade: String(entry.grade), lang: entry.language, count: String(entry.count) });
+    const query = new URLSearchParams({ topic: entry.topic, grade: String(entry.grade), lang: entry.language, count: String(entry.count), ...entry.extra });
     href = `/subject/${entry.subject}/${docPath(entry.docKind)}?${query}`;
   } else if (entry.kind === "lesson") {
     icon = <BookIcon />;

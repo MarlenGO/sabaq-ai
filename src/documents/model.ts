@@ -7,6 +7,8 @@ export interface Run {
   text: string;
   bold?: boolean;
   italic?: boolean;
+  /** Жёлтая пометка — только на листе сайта (например, «тексеріңіз»), в файл не идёт */
+  mark?: boolean;
 }
 
 export interface Para {
@@ -30,12 +32,16 @@ export interface Cell {
   shade?: boolean;
   /** Ширина в twips (1/20 пункта) — считается сама по колонкам */
   width?: number;
+  /** Пустая клетка без рамки — фон кроссворда */
+  blank?: boolean;
 }
 
 export interface Row {
   cells: Cell[];
   /** Строка заголовков: в Word повторяется на каждой странице */
   header?: boolean;
+  /** Точная высота строки в пунктах — квадратные клетки кроссворда */
+  height?: number;
 }
 
 export interface Table {
@@ -43,6 +49,8 @@ export interface Table {
   /** Ширины колонок в twips, как в шаблоне Word */
   columns: number[];
   rows: Row[];
+  /** Сетка кроссворда: рамки только у клеток с буквами, без полей внутри клеток */
+  grid?: boolean;
 }
 
 export type Block = ({ type: "p" } & Para) | Table | { type: "pageBreak" };

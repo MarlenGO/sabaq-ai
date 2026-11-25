@@ -72,10 +72,12 @@ export function AdminUsers({ users, invites, defaultLimit, selfId, dates }: Prop
         <h2 className="text-title2 font-bold">
           {t.admin.users} <span className="text-label-2">· {users.length}</span>
         </h2>
+        {/* Один белый лист со строками-разделителями, а не отдельные карточки */}
+        <Card className="divide-y divide-separator overflow-hidden">
         {users.map((user) => {
           const self = user.id === selfId;
           return (
-            <Card key={user.id} className="flex flex-col gap-3 p-4">
+            <div key={user.id} className="flex flex-col gap-3 p-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="text-body font-semibold">
@@ -161,9 +163,10 @@ export function AdminUsers({ users, invites, defaultLimit, selfId, dates }: Prop
                   </Button>
                 )}
               </div>
-            </Card>
+            </div>
           );
         })}
+        </Card>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">

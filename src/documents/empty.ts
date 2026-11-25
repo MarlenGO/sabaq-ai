@@ -36,6 +36,18 @@ export function emptyDocument<K extends DocKind>(kind: K, language: Language, co
         { task: "2", descriptor: dots, points: 3 },
       ],
     },
+    pisa: {
+      title: dots,
+      situation: dots,
+      questions: [1, 2, 2, 3].map((points) => ({ question: dots, skill: dots, answer: dots, scoring: dots, points })),
+    },
+    worksheet: {
+      matching: Array.from({ length: 5 }, () => ({ term: dots, definition: dots })),
+      crossword: [],
+      gaps: Array.from({ length: 5 }, () => ({ sentence: "… ________ …", answer: dots })),
+      trueFalse: Array.from({ length: 5 }, () => ({ statement: dots, correct: true })),
+      questions: Array.from({ length: 3 }, () => ({ question: dots, answer: dots })),
+    },
   };
   return docs[kind];
 }

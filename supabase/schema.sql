@@ -128,6 +128,21 @@ create table if not exists ai_usage (
 create index if not exists ai_usage_user on ai_usage (user_id, at desc);
 create index if not exists ai_usage_at on ai_usage (at desc);
 
+-- КТП учителя (күнтізбелік-тақырыптық жоспар): загружен из Word/Excel, уроки в lessons jsonb.
+-- У учителя может быть несколько планов — по одному на предмет и класс
+create table if not exists plans (
+  id text primary key,
+  owner_id uuid not null references users on delete cascade,
+  title text not null,
+  subject text not null,
+  grade integer not null,
+  language text not null,
+  lessons jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists plans_owner on plans (owner_id, updated_at desc);
+
 alter table users enable row level security;
 alter table sessions enable row level security;
 alter table login_links enable row level security;
@@ -139,3 +154,4 @@ alter table players enable row level security;
 alter table answers enable row level security;
 alter table activity enable row level security;
 alter table ai_usage enable row level security;
+alter table plans enable row level security;

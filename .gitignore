@@ -43,3 +43,6 @@ next-env.d.ts
 # saved lessons (local file storage)
 /data/
 !.env.example
+
+# проверочные файлы ҚМЖ
+/tmp/

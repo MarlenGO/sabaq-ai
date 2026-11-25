@@ -5,12 +5,13 @@ import { useState, type ReactNode } from "react";
 import type { Subject } from "@/types/topic-package";
 import { deckTypeOrder } from "@/slides/structures";
 import { games } from "@/games/registry";
-import { deckTypeIcon, docIcon, docPath, gameIcon } from "@/data/catalog";
+import { deckTypeIcon, docIcon, docPath, gameIcon, type CreateKind } from "@/data/catalog";
 import { docKinds } from "@/types/documents";
 import { useT } from "@/i18n/client";
 import { SearchField } from "@/components/ui/SearchField";
 import { LucideIcon } from "@/components/ui/LucideIcon";
-import { ArrowLeftIcon, ChevronRightIcon } from "@/components/ui/Icons";
+import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon } from "@/components/ui/Icons";
+import { CreatePanel } from "@/components/home/CreateForm";
 import { SubjectBadge, subjectColors } from "@/components/home/SubjectBadge";
 
 interface Item {
@@ -24,9 +25,14 @@ interface Item {
 // и «Ойындар» (все игры).
 // Каждый список — один белый лист со строками, как страница в тетради:
 // глазу спокойнее, чем от россыпи отдельных карточек. Поиск фильтрует все три.
+// Презентация и игра создаются прямо здесь: нажали на строку — под ней раскрылась
+// короткая форма (тема, язык, класс), без лишней страницы. Открыта одна строка за раз.
+// Документы открываются отдельной страницей: там нужен предпросмотр листа.
 export function SubjectMenu({ subject }: { subject: Subject }) {
   const t = useT();
   const [query, setQuery] = useState("");
+  const [open, setOpen] = useState<string | null>(null);
+  const toggle = (key: string) => setOpen(open === key ? null : key);
   const q = query.trim().toLowerCase();
   const match = (item: Item) => !q || `${item.title} ${item.text}`.toLowerCase().includes(q);
 
@@ -42,8 +48,9 @@ export function SubjectMenu({ subject }: { subject: Subject }) {
 
   return (
     <div style={subjectColors(subject)}>
+      {/* ?all=1 — сетка всех предметов, даже если выбран «Менің пәнім» */}
       <Link
-        href="/"
+        href="/?all=1"
         className="inline-flex h-11 items-center gap-1.5 rounded-full pr-3 text-subhead font-semibold text-accent hover:opacity-70"
       >
         <ArrowLeftIcon />
@@ -69,14 +76,28 @@ export function SubjectMenu({ subject }: { subject: Subject }) {
         {decks.length > 0 && (
           <List title={t.subject.presentations} hint={t.subject.presentationsHint}>
             {decks.map((item) => (
-              <Row key={item.id} item={item} href={`/subject/${subject}/${item.id}`} />
+              <CreateRow
+                key={item.id}
+                item={item}
+                subject={subject}
+                kind={{ type: "deck", id: item.id }}
+                open={open === `deck:${item.id}`}
+                onToggle={() => toggle(`deck:${item.id}`)}
+              />
             ))}
           </List>
         )}
         {gameItems.length > 0 && (
           <List title={t.subject.games} hint={t.subject.gamesHint}>
             {gameItems.map((item) => (
-              <Row key={item.id} item={item} href={`/subject/${subject}/${item.id}`} />
+              <CreateRow
+                key={item.id}
+                item={item}
+                subject={subject}
+                kind={{ type: "game", id: item.id }}
+                open={open === `game:${item.id}`}
+                onToggle={() => toggle(`game:${item.id}`)}
+              />
             ))}
           </List>
         )}
@@ -86,12 +107,14 @@ export function SubjectMenu({ subject }: { subject: Subject }) {
   );
 }
 
+// Без overflow-hidden у списка: иначе всплывающие списки формы обрезаются краем листа.
+// Поэтому углы скругляем сами — у первой и последней строки.
 function List({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
   return (
     <section>
       <h2 className="text-title2 font-extrabold tracking-tight">{title}</h2>
       <p className="mt-0.5 text-subhead text-label-2">{hint}</p>
-      <ul className="mt-4 divide-y divide-separator overflow-hidden rounded-3xl bg-surface">{children}</ul>
+      <ul className="mt-4 divide-y divide-separator rounded-3xl bg-surface *:first:rounded-t-3xl *:last:rounded-b-3xl">{children}</ul>
     </section>
   );
 }
@@ -99,7 +122,7 @@ function List({ title, hint, children }: { title: string; hint: string; children
 function Row({ item, href }: { item: Item; href: string }) {
   return (
     <li>
-      <Link href={href} className="flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-fill sm:px-5">
+      <Link href={href} className="flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-fill sm:px-5 [li:first-child>&]:rounded-t-3xl [li:last-child>&:last-child]:rounded-b-3xl">
         {/* Иконка в цвете предмета: страница «Тарих» — тёплая, «Физика» — фиолетовая */}
         <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-(--tile) text-(--ink)">
           <LucideIcon svg={item.icon} className="size-6 [&>svg]:stroke-[1.7]" />
@@ -110,6 +133,43 @@ function Row({ item, href }: { item: Item; href: string }) {
         </span>
         <ChevronRightIcon className="shrink-0 text-label-3" />
       </Link>
+    </li>
+  );
+}
+
+/** Строка, которая раскрывается в форму создания прямо под собой */
+function CreateRow(props: {
+  item: Item;
+  subject: Subject;
+  kind: Exclude<CreateKind, { type: "doc" }>;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const { item, open } = props;
+  const panelId = `create-${props.kind.type}-${item.id}`;
+  return (
+    <li className={open ? "bg-(--tile)/40" : ""}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={props.onToggle}
+        className="flex w-full items-center gap-4 px-4 py-3.5 text-left transition-colors hover:bg-fill sm:px-5 [li:first-child>&]:rounded-t-3xl [li:last-child>&:last-child]:rounded-b-3xl"
+      >
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-(--tile) text-(--ink)">
+          <LucideIcon svg={item.icon} className="size-6 [&>svg]:stroke-[1.7]" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-body font-bold leading-snug">{item.title}</span>
+          <span className="block text-footnote text-label-2">{item.text}</span>
+        </span>
+        <ChevronDownIcon className={`shrink-0 transition ${open ? "rotate-180 text-accent" : "text-label-3"}`} />
+      </button>
+      {open && (
+        <div id={panelId} className="px-4 pb-5 pt-1 sm:px-5">
+          <CreatePanel subject={props.subject} kind={props.kind} autoFocus />
+        </div>
+      )}
     </li>
   );
 }

@@ -21,6 +21,10 @@ for (const key of blockKeys) {
   }));
 }
 if (Array.isArray(data.task1_descriptors)) data.task1_descriptors = data.task1_descriptors.join('; ') + '.';
+// Минуты заданий и строка 4-тапсырма (как в src/lib/kmzh/fill.ts): 3 задания — 8/7/8, 4 — 6/6/6/5
+data.has_task4 = Boolean(data.task4_teacher);
+(data.has_task4 ? [6, 6, 6, 5] : [8, 7, 8]).forEach((m, i) => (data[`task${i + 1}_min`] = m));
+if (data.task4_teacher) data.task4_teacher = data.task4_teacher.map((b) => ({ title: b.title || '', sp: b.title ? ' ' : '', text: b.text || '' }));
 
 const zip = new PizZip(fs.readFileSync(templatePath));
 const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });

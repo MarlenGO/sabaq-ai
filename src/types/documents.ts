@@ -5,7 +5,7 @@ import { lessonRequestSchema } from "./topic-package";
 // Конструктора у них нет: AI пишет содержание, страница показывает предпросмотр,
 // а править учитель может уже в Word. Схемы — для Gemini и для проверки ответа.
 
-export const docKindSchema = z.enum(["kmzh", "test", "bzhb"]);
+export const docKindSchema = z.enum(["kmzh", "test", "bzhb", "pisa", "worksheet"]);
 export type DocKind = z.infer<typeof docKindSchema>;
 export const docKinds = docKindSchema.options;
 
@@ -70,9 +70,58 @@ export const bzhbSchema = z.object({
     .max(20),
 });
 
-export const docSchemas = { kmzh: kmzhSchema, test: testDocSchema, bzhb: bzhbSchema } satisfies Record<DocKind, z.ZodType>;
+/** Задание PISA: одна жизненная ситуация и 4 вопроса к ней + руководство по оцениванию */
+export const pisaSchema = z.object({
+  /** Название ситуации: «Велосипедпен мектепке» */
+  title: z.string().max(150),
+  /** Текст ситуации: факты, числа, при необходимости — данные таблицей в строках */
+  situation: z.string().max(3000),
+  questions: z
+    .array(
+      z.object({
+        question: block,
+        /** Что проверяет вопрос: «Ақпаратты табу», «Түсіндіру», «Бағалау және негіздеу» */
+        skill: z.string().max(120),
+        answer: block,
+        /** Как ставить баллы: полный / частичный / нет ответа */
+        scoring: block,
+        points: z.number().int().min(1).max(3),
+      }),
+    )
+    .length(4),
+});
 
-export type DocData = { kmzh: z.infer<typeof kmzhSchema>; test: z.infer<typeof testDocSchema>; bzhb: z.infer<typeof bzhbSchema> };
+/**
+ * Жұмыс парағы — раздаточный лист для печати, только на казахском: пять заданий
+ * разного вида по теме и ответы для учителя на отдельной странице.
+ * Кроссворд раскладывает код (documents/crossword.ts), AI даёт только слова и подсказки.
+ */
+export const worksheetSchema = z.object({
+  /** Сәйкестендіру: термин — анықтама */
+  matching: z.array(z.object({ term: z.string().max(80), definition: z.string().max(250) })).min(4).max(8),
+  /** Сөзжұмбақ: одно слово без пробелов и подсказка-вопрос */
+  crossword: z.array(z.object({ word: z.string().max(20), clue: z.string().max(200) })).min(5).max(10),
+  /** Бос орынды толтыр: предложение с «____» и пропущенное слово */
+  gaps: z.array(z.object({ sentence: z.string().max(300), answer: z.string().max(60) })).min(4).max(8),
+  /** Дұрыс па, бұрыс па? */
+  trueFalse: z.array(z.object({ statement: line, correct: z.boolean() })).min(4).max(8),
+  /** Ойлан да жауап бер: вопрос или задача + ответ для учителя */
+  questions: z.array(z.object({ question: block, answer: block })).min(2).max(4),
+});
+
+export const docSchemas = { kmzh: kmzhSchema, test: testDocSchema, bzhb: bzhbSchema, pisa: pisaSchema, worksheet: worksheetSchema } satisfies Record<DocKind, z.ZodType>;
+
+export type DocData = {
+  kmzh: z.infer<typeof kmzhSchema>;
+  test: z.infer<typeof testDocSchema>;
+  bzhb: z.infer<typeof bzhbSchema>;
+  pisa: z.infer<typeof pisaSchema>;
+  worksheet: z.infer<typeof worksheetSchema>;
+};
+
+/** ҚМЖ: вид плана и тип урока (по умолчанию — полный план, новый материал) */
+export const planTypes = ["full", "short", "simple", "sen"] as const;
+export const lessonTypes = ["new", "consolidate", "practice", "review"] as const;
 
 /** Сколько вопросов можно выбрать для теста */
 export const testCounts = [10, 15, 20, 25, 30] as const;
@@ -81,6 +130,16 @@ export const documentRequestSchema = lessonRequestSchema.pick({ topic: true, gra
   kind: docKindSchema,
   /** Количество вопросов — только для теста */
   count: z.number().int().min(5).max(30).default(15),
+  /** Только ҚМЖ: что учитель знает сам. Пустое оқу мақсаты и бөлім предлагает AI */
+  section: z.string().trim().max(200).default(""),
+  objective: z.string().trim().max(400).default(""),
+  textbook: z.string().trim().max(200).default(""),
+  /** Апта құндылығы — ценность недели, если в школе она есть */
+  value: z.string().trim().max(200).default(""),
+  planType: z.enum(planTypes).default("full"),
+  lessonType: z.enum(lessonTypes).default("new"),
+  /** Число заданий ҚМЖ: 3 (баллы 4 + 6) или 4 (баллы 3 + 4 + 3), всего 10 */
+  taskCount: z.union([z.literal(3), z.literal(4)]).default(3),
   /** Открыт заново из «Тарих» — в историю второй раз не пишем */
   again: z.boolean().optional(),
 });

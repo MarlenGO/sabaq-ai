@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { getT } from "@/i18n/server";
 import { Tools } from "@/components/tools/Tools";
 
-// «Құралдар»: опыты PhET, справочник по физике, конвертер. ?tab=reference — сразу справочник
+// «Құралдар»: опыты PhET, справочник по физике, таймер, конвертер. ?tab=reference или ?tab=timer — сразу нужная вкладка
 export default async function ToolsPage({ searchParams }: PageProps<"/tools">) {
   const t = await getT();
   return (
@@ -21,5 +21,5 @@ export default async function ToolsPage({ searchParams }: PageProps<"/tools">) {
 
 async function ToolsWithTab({ searchParams }: { searchParams: PageProps<"/tools">["searchParams"] }) {
   const { tab } = await searchParams;
-  return <Tools initialTab={tab === "reference" || tab === "convert" ? tab : "phet"} />;
+  return <Tools initialTab={tab === "reference" || tab === "timer" || tab === "convert" ? tab : "phet"} />;
 }

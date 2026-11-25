@@ -23,6 +23,7 @@ function para(p: Para, tag = "p") {
       let html = esc(r.text);
       if (r.bold) html = `<b>${html}</b>`;
       if (r.italic) html = `<i>${html}</i>`;
+      if (r.mark) html = `<mark style="background:#fff0a0;color:#000">${html}</mark>`;
       return html;
     })
     .join("");
@@ -43,14 +44,18 @@ function block(b: Block) {
           // Высота объединённой ячейки: сколько строк ниже продолжают её
           const rowspan = c.vmerge === "restart" ? countMerged(table.rows, table.rows.indexOf(row), cellColumn(list, i, row)) : 1;
           const attrs = [c.span && c.span > 1 ? `colspan="${c.span}"` : "", rowspan > 1 ? `rowspan="${rowspan}"` : ""].join(" ");
-          const style = `${TD}${c.shade ? ";background:#f2f2f2" : ""}`;
+          const style = c.blank
+            ? "border:none;padding:0"
+            : `${TD}${c.shade ? ";background:#f2f2f2" : ""}${table.grid ? ";padding:0 1pt;overflow:hidden" : ""}`;
           return `<td ${attrs} style="${style}">${c.paras.map((p) => para(p)).join("")}</td>`;
         })
         .join("");
-      return `<tr>${cells}</tr>`;
+      return `<tr${row.height ? ` style="height:${row.height}pt"` : ""}>${cells}</tr>`;
     })
     .join("");
-  return `<table style="width:100%;border-collapse:collapse;table-layout:fixed;margin:0 0 10pt">${cols}${rows}</table>`;
+  // Сетка кроссворда — своей ширины (квадратные клетки), остальные таблицы — во всю строку
+  const width = table.grid ? `width:${total / 20}pt` : "width:100%";
+  return `<table style="${width};border-collapse:collapse;table-layout:fixed;margin:0 0 10pt">${cols}${rows}</table>`;
 }
 
 /** Номер колонки ячейки в строке (с учётом span и пропущенных continue) */

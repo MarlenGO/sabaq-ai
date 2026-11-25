@@ -34,6 +34,7 @@ function para(p: Para) {
 }
 
 const border = (side: string) => `<w:${side} w:val="single" w:sz="4" w:space="0" w:color="000000"/>`;
+const noBorder = (side: string) => `<w:${side} w:val="nil"/>`;
 
 function block(b: Block): string {
   if (b.type === "p") return para(b);
@@ -42,13 +43,18 @@ function block(b: Block): string {
   const total = table.columns.reduce((a, c) => a + c, 0);
   const rows = table.rows
     .map((row) => {
-      const trPr = row.header ? "<w:trPr><w:tblHeader/></w:trPr>" : "";
+      const trProps = [row.header ? "<w:tblHeader/>" : "", row.height ? `<w:trHeight w:val="${twips(row.height)}" w:hRule="exact"/>` : ""].join("");
+      const trPr = trProps ? `<w:trPr>${trProps}</w:trPr>` : "";
       const cells = row.cells
         .map((c) => {
           const tcPr = [
             `<w:tcW w:w="${c.width}" w:type="dxa"/>`,
             c.span && c.span > 1 ? `<w:gridSpan w:val="${c.span}"/>` : "",
             c.vmerge === "restart" ? `<w:vMerge w:val="restart"/>` : c.vmerge === "continue" ? "<w:vMerge/>" : "",
+            // Сетка кроссворда: у таблицы рамок нет, у клеток с буквами — свои, у пустых — никаких
+            table.grid
+              ? `<w:tcBorders>${["top", "left", "bottom", "right"].map(c.blank ? noBorder : border).join("")}</w:tcBorders>`
+              : "",
             c.shade ? `<w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>` : "",
           ].join("");
           // В каждой ячейке Word требует хотя бы один абзац
@@ -61,8 +67,10 @@ function block(b: Block): string {
     .join("");
   return [
     `<w:tbl><w:tblPr><w:tblW w:w="${total}" w:type="dxa"/><w:tblLayout w:type="fixed"/>`,
-    `<w:tblBorders>${["top", "left", "bottom", "right", "insideH", "insideV"].map(border).join("")}</w:tblBorders>`,
-    `<w:tblCellMar><w:top w:w="28" w:type="dxa"/><w:left w:w="85" w:type="dxa"/><w:bottom w:w="28" w:type="dxa"/><w:right w:w="85" w:type="dxa"/></w:tblCellMar>`,
+    `<w:tblBorders>${["top", "left", "bottom", "right", "insideH", "insideV"].map(table.grid ? noBorder : border).join("")}</w:tblBorders>`,
+    table.grid
+      ? `<w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="20" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="20" w:type="dxa"/></w:tblCellMar>`
+      : `<w:tblCellMar><w:top w:w="28" w:type="dxa"/><w:left w:w="85" w:type="dxa"/><w:bottom w:w="28" w:type="dxa"/><w:right w:w="85" w:type="dxa"/></w:tblCellMar>`,
     `<w:tblLook w:val="04A0"/></w:tblPr>`,
     `<w:tblGrid>${table.columns.map((w) => `<w:gridCol w:w="${w}"/>`).join("")}</w:tblGrid>`,
     rows,

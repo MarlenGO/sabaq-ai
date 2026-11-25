@@ -29,8 +29,12 @@ export async function buildHistory(userId: string): Promise<HistoryEntry[]> {
   for (const a of activity) {
     const ref = `activity:${a.id}`;
     if (a.type === "document") {
-      const { docKind, subject, topic, grade, language, count } = a;
-      entries.push({ kind: "document", at: a.at, ref, docKind, subject, topic, grade, language, count });
+      const { docKind, subject, topic, grade, language, count, v, section, objective, textbook, value, planType, lessonType, taskCount } = a;
+      // Пустые поля в адрес не кладём
+      const extra = Object.fromEntries(
+        Object.entries({ v: v ? String(v) : "", section, objective, textbook, value, planType, lessonType, tasks: taskCount === 4 ? "4" : "" }).filter((e): e is [string, string] => Boolean(e[1])),
+      );
+      entries.push({ kind: "document", at: a.at, ref, docKind, subject, topic, grade, language, count, extra });
       continue;
     }
     const lesson = byId.get(a.lessonId);

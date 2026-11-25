@@ -4,12 +4,14 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import type { Language, Subject } from "@/types/topic-package";
-import { docSchemas, testCounts, type DocKind } from "@/types/documents";
+import { docSchemas, lessonTypes, planTypes, testCounts, type DocData, type DocKind, type DocumentRequest } from "@/types/documents";
 import { docIcon } from "@/data/catalog";
 import { buildDocument, docTitle } from "@/documents/render";
 import { toHtmlBody, toPrintPage } from "@/documents/html";
 import { DOCX_TYPE, toDocx } from "@/documents/docx";
 import { emptyDocument } from "@/documents/empty";
+import { emptyKmzh, kmzhAiSchema, type KmzhAi, type KmzhDoc } from "@/lib/kmzh/schema";
+import { kmzhPreview } from "@/lib/kmzh/preview";
 import { kk } from "@/i18n/kk";
 import { ru } from "@/i18n/ru";
 import { useT } from "@/i18n/client";
@@ -19,6 +21,7 @@ import { FileText } from "lucide-static";
 import { Button } from "@/components/ui/Button";
 import { LucideIcon } from "@/components/ui/LucideIcon";
 import { ArrowLeftIcon, MicIcon, PencilIcon, SparkleIcon } from "@/components/ui/Icons";
+import { PopoverSelect } from "@/components/ui/Popover";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { subjectColors } from "@/components/home/SubjectBadge";
 
@@ -34,9 +37,36 @@ interface Draft {
   date: string;
   /** Сколько вопросов в тесте */
   count: number;
+  /** Только ҚМЖ: бөлім, оқу мақсаты (пусто — предложит AI), оқулық, апта құндылығы */
+  section: string;
+  objective: string;
+  textbook: string;
+  value: string;
+  /** Только ҚМЖ: вид плана, тип урока и число заданий (3 или 4) */
+  planType: DocumentRequest["planType"];
+  lessonType: DocumentRequest["lessonType"];
+  taskCount: DocumentRequest["taskCount"];
 }
 
-const emptyDraft: Draft = { topic: "", grade: 7, language: "kk", mode: "ai", teacher: "", school: "", date: "", count: 15 };
+const emptyDraft: Draft = {
+  topic: "",
+  grade: 7,
+  language: "kk",
+  mode: "ai",
+  teacher: "",
+  school: "",
+  date: "",
+  count: 15,
+  section: "",
+  objective: "",
+  textbook: "",
+  value: "",
+  planType: "full",
+  lessonType: "new",
+  taskCount: 3,
+};
+/** Поля ҚМЖ, которые учитель пишет сам: и в запросе, и в адресе из «Тарих» */
+const kmzhFields = ["section", "objective", "textbook", "value", "planType", "lessonType"] as const;
 /** Последний документ AI: для какой темы/класса/языка (for) и сам текст */
 const noResult = { for: "", data: null as unknown };
 /** Классы 6–11: сайт для средней и старшей школы, все помещаются в одну строку */
@@ -51,60 +81,111 @@ export function DocumentWorkspace({ subject, kind }: { subject: Subject; kind: D
   const [stored, setDraft] = useStoredState("sabaq-doc", emptyDraft);
   const merged: Draft = { ...emptyDraft, ...stored };
   // В старых черновиках мог остаться класс 1–5 — их больше нет в списке
-  const draft: Draft = { ...merged, grade: grades.includes(merged.grade) ? merged.grade : 7 };
+  // Жұмыс парағы — только на казахском; выбор языка у других документов не трогаем
+  const onlyKazakh = kind === "worksheet";
+  const draft: Draft = {
+    ...merged,
+    grade: grades.includes(merged.grade) ? merged.grade : 7,
+    ...(onlyKazakh ? { language: "kk" as const } : {}),
+  };
   const [result, setResult] = useStoredState(`sabaq-doc-${kind}-${subject}`, noResult);
   const [loading, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const update = (patch: Partial<Draft>) => {
-    setDraft({ ...draft, ...patch });
+    setDraft({ ...draft, language: merged.language, ...patch });
     setError(null);
   };
   const voice = useVoiceInput(draft.language, (text) => update({ topic: text }));
   const hasTopic = draft.topic.trim().length >= 2;
   const isTest = kind === "test";
-  const keyOf = (d: Draft) => `${d.topic.trim().toLowerCase()}|${d.grade}|${d.language}${isTest ? `|${d.count}` : ""}`;
+  const isKmzh = kind === "kmzh";
+  const keyOf = (d: Draft) =>
+    `${d.topic.trim().toLowerCase()}|${d.grade}|${d.language}${isTest ? `|${d.count}` : ""}${
+      isKmzh ? `|${kmzhFields.map((f) => d[f].trim().toLowerCase()).join("|")}${d.taskCount === 4 ? "|t4" : ""}` : ""
+    }`;
   const requestKey = keyOf(draft);
 
   // Сохранённый документ мог остаться от старой версии схемы — проверяем
   const saved = useMemo(() => {
-    const parsed = docSchemas[kind].safeParse(result.data);
+    const parsed = (isKmzh ? kmzhAiSchema : docSchemas[kind]).safeParse(result.data);
     return parsed.success ? parsed.data : null;
-  }, [kind, result.data]);
+  }, [isKmzh, kind, result.data]);
   const useSaved = draft.mode === "ai" && saved !== null && result.for === requestKey;
   const stale = draft.mode === "ai" && saved !== null && !useSaved && hasTopic;
 
   const title = docTitle(kind, draft.language);
-  const doc = buildDocument(kind, useSaved ? saved : emptyDocument(kind, draft.language, draft.count), {
+  // ҚМЖ: один JSON (поля учителя + ответ AI) — из него и лист справа, и файл Word
+  const ai = (useSaved ? saved : emptyKmzh()) as KmzhAi;
+  const kmzh: KmzhDoc = {
+    ...ai,
+    teacher_name: draft.teacher.trim(),
+    date: draft.date.trim(),
+    grade: String(draft.grade),
     topic: draft.topic.trim() || "…",
-    grade: draft.grade,
-    language: draft.language,
-    subjectName: subjectNames[draft.language][subject],
-    teacher: draft.teacher,
-    school: draft.school,
-    date: draft.date,
-  });
-  const body = toHtmlBody(doc);
+    section: draft.section.trim() || ai.section,
+    learning_objective: draft.objective.trim() || ai.learning_objective,
+    textbook_ref: draft.textbook.trim(),
+  };
+  // Бөлім и оқу мақсаты, которые предложил AI, на листе помечены «тексеріңіз» (в файл и печать пометка не идёт)
+  const suggested = useSaved
+    ? [!draft.section.trim() && ("section" as const), !draft.objective.trim() && ("learning_objective" as const)].filter((x) => x !== false)
+    : [];
+  const doc = isKmzh
+    ? kmzhPreview(kmzh)
+    : buildDocument<DocKind>(kind, (useSaved ? saved : emptyDocument(kind, draft.language, draft.count)) as DocData[DocKind], {
+        topic: draft.topic.trim() || "…",
+        grade: draft.grade,
+        language: draft.language,
+        subjectName: subjectNames[draft.language][subject],
+        teacher: draft.teacher,
+        school: draft.school,
+        date: draft.date,
+      });
+  const body = toHtmlBody(isKmzh ? kmzhPreview(kmzh, suggested) : doc);
 
-  const generate = (from: Draft = draft, again = false) =>
+  /** afterwards — что сделать после удачного ответа (отметить урок в «Жоспар») */
+  const generate = (from: Draft = draft, again = false, afterwards?: () => Promise<unknown>) =>
     startTransition(async () => {
       setError(null);
-      const { topic, grade, language, count } = from;
+      const { topic, grade, language, count, section, objective, textbook, value, planType, lessonType, taskCount } = from;
+      setOldFormat(false);
       const response = await fetch("/api/documents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind, topic, grade, language, subject, count, again }),
+        body: JSON.stringify({
+          kind,
+          topic,
+          grade,
+          language,
+          subject,
+          count,
+          section,
+          objective,
+          textbook,
+          value,
+          planType,
+          lessonType,
+          taskCount,
+          again,
+        }),
       }).catch(() => null);
       const data = await response?.json().catch(() => null);
-      if (response?.ok && data?.data) setResult({ for: keyOf(from), data: data.data });
-      else setError(data?.error ?? t.form.netError);
+      if (response?.ok && data?.data) {
+        setResult({ for: keyOf(from), data: data.data });
+        await afterwards?.().catch(() => {});
+      } else setError(data?.error ?? t.form.netError);
     });
 
   // Открыт из «Тарих» (?topic=…&grade=…&lang=…&count=…): подставляем тему и берём
   // документ из кэша — AI второй раз не тратится. Адрес сразу очищаем.
+  // Из «Жоспар» (&plan=…&lesson=…&date=…): ҚМЖ по уроку КТП — новая запись в «Тарих»
+  // и галочка у урока; &done=1 — ҚМЖ по уроку уже был, просто открываем.
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const fromHistory = params.get("topic");
+  /** Старый ҚМЖ из «Тарих» (до Word-шаблона): его нет в новом кэше — предлагаем пересоздать */
+  const [oldFormat, setOldFormat] = useState(false);
   useEffect(() => {
     if (!fromHistory) return;
     const grade = Number(params.get("grade"));
@@ -116,20 +197,49 @@ export function DocumentWorkspace({ subject, kind }: { subject: Subject; kind: D
       grade: grades.includes(grade) ? grade : draft.grade,
       language: params.get("lang") === "ru" ? "ru" : "kk",
       count: testCounts.includes(count as (typeof testCounts)[number]) ? count : draft.count,
+      ...Object.fromEntries(kmzhFields.map((f) => [f, params.get(f) ?? emptyDraft[f]])),
+      taskCount: params.get("tasks") === "4" ? 4 : 3,
+      date: params.get("date") ?? draft.date,
     };
     setDraft(next);
     router.replace(pathname);
-    if (result.for !== keyOf(next)) generate(next, true);
+    const planId = params.get("plan");
+    const lessonId = params.get("lesson");
+    const fromPlan = Boolean(planId && lessonId) && params.get("done") !== "1";
+    const markLesson = () =>
+      fetch(`/api/plans/${planId}/kmzh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lesson: lessonId }),
+      });
+    if (isKmzh && params.get("v") !== "2") setOldFormat(true);
+    else if (fromPlan) generate(next, false, markLesson);
+    else if (result.for !== keyOf(next)) generate(next, true);
     // Только при открытии из истории
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromHistory]);
 
-  const fileName = `${title} — ${draft.topic.trim() || t.docs.document}`.replace(/[\\/:*?"<>|]+/g, " ").slice(0, 90);
+  // «ҚМЖ - Тақырып»: у ҚМЖ на обоих языках сайта приставка «ҚМЖ»
+  const fileName = `${isKmzh ? "ҚМЖ" : title} - ${draft.topic.trim() || t.docs.document}`.replace(/[\\/:*?"<>|]+/g, " ").slice(0, 90);
 
-  const downloadWord = () => {
-    // Настоящий .docx: таблицы с фиксированными колонками — в Word ничего не съезжает
-    const bytes = toDocx(doc);
-    const blob = new Blob([bytes.buffer as ArrayBuffer], { type: DOCX_TYPE });
+  const downloadWord = async () => {
+    // ҚМЖ собирает сервер по Word-шаблону из того же JSON, что на листе; остальные —
+    // настоящий .docx прямо в браузере (таблицы с фиксированными колонками)
+    let blob: Blob;
+    if (isKmzh) {
+      const response = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ word: kmzh }),
+      }).catch(() => null);
+      if (!response?.ok) {
+        setError(t.form.netError);
+        return;
+      }
+      blob = await response.blob();
+    } else {
+      blob = new Blob([toDocx(doc).buffer as ArrayBuffer], { type: DOCX_TYPE });
+    }
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -162,10 +272,7 @@ export function DocumentWorkspace({ subject, kind }: { subject: Subject; kind: D
             {t.subjects[subject]}
           </Link>
           <div className="mt-1 flex items-center gap-3">
-            <span
-              style={subjectColors(subject)}
-              className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-(--tile) text-(--ink)"
-            >
+            <span style={subjectColors(subject)} className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-(--tile) text-(--ink)">
               <LucideIcon svg={docIcon[kind]} className="size-7 [&>svg]:stroke-[1.6]" />
             </span>
             <div>
@@ -207,69 +314,135 @@ export function DocumentWorkspace({ subject, kind }: { subject: Subject; kind: D
             {voice.listening && <p className="mt-2 text-subhead text-red">{t.form.listening}</p>}
           </Field>
 
-          <Field title={t.form.contentLanguage}>
-            <SegmentedControl
-              ariaLabel={t.form.contentLanguage}
-              value={draft.language}
-              onChange={(language) => update({ language })}
-              options={[
-                { value: "kk", label: "Қазақша" },
-                { value: "ru", label: "Русский" },
-              ]}
-            />
-          </Field>
-
-          <Field title={t.form.gradeLabel}>
-            <div role="radiogroup" aria-label={t.form.gradeLabel} className="grid grid-cols-6 gap-1.5">
-              {grades.map((grade) => (
-                <button
-                  key={grade}
-                  type="button"
-                  role="radio"
-                  aria-checked={grade === draft.grade}
-                  aria-label={t.common.grade(grade)}
-                  onClick={() => update({ grade })}
-                  className={`flex h-11 items-center justify-center rounded-xl text-callout font-semibold transition ${
-                    grade === draft.grade ? "bg-accent text-white" : "bg-fill text-label hover:bg-accent/15"
-                  }`}
-                >
-                  {grade}
-                </button>
-              ))}
-            </div>
-          </Field>
-
-          {isTest && (
-            <Field title={t.docs.count}>
-              <SegmentedControl
-                ariaLabel={t.docs.count}
-                value={String(draft.count)}
-                onChange={(value) => update({ count: Number(value) })}
-                options={testCounts.map((n) => ({ value: String(n), label: String(n) }))}
+          {/* Остальные настройки — один компактный список, как «Настройки» в iPhone:
+              название слева мелко, значение справа; заметной остаётся только тема */}
+          <div className="divide-y divide-separator rounded-2xl border border-accent/25">
+            <Setting title={t.form.contentLanguage}>
+              {onlyKazakh ? (
+                <span className="px-2 text-callout font-semibold text-label-2">Қазақша</span>
+              ) : (
+                <PopoverSelect
+                  inline
+                  alignRight
+                  ariaLabel={t.form.contentLanguage}
+                  value={draft.language}
+                  onChange={(language) => update({ language })}
+                  options={[
+                    { value: "kk", label: "Қазақша" },
+                    { value: "ru", label: "Русский" },
+                  ]}
+                />
+              )}
+            </Setting>
+            <Setting title={t.form.gradeLabel}>
+              <PopoverSelect
+                inline
+                alignRight
+                ariaLabel={t.form.gradeLabel}
+                value={String(draft.grade)}
+                onChange={(value) => update({ grade: Number(value) })}
+                options={grades.map((grade) => ({
+                  value: String(grade),
+                  label: t.common.grade(grade),
+                }))}
               />
-            </Field>
-          )}
+            </Setting>
+            {isTest && (
+              <Setting title={t.docs.count}>
+                <PopoverSelect
+                  inline
+                  alignRight
+                  ariaLabel={t.docs.count}
+                  value={String(draft.count)}
+                  onChange={(value) => update({ count: Number(value) })}
+                  options={testCounts.map((n) => ({
+                    value: String(n),
+                    label: String(n),
+                  }))}
+                />
+              </Setting>
+            )}
+            {isKmzh && (
+              <>
+                <Setting title={t.docs.section}>
+                  <input
+                    value={draft.section}
+                    onChange={(e) => update({ section: e.target.value })}
+                    aria-label={t.docs.section}
+                    placeholder={t.docs.optional}
+                    className="h-11 min-w-0 flex-1 rounded-lg bg-transparent px-2 text-right text-callout font-semibold text-accent outline-none placeholder:font-normal placeholder:text-label-3 focus:bg-accent/8"
+                  />
+                </Setting>
+                <Setting title={t.docs.planType}>
+                  <PopoverSelect
+                    inline
+                    alignRight
+                    ariaLabel={t.docs.planType}
+                    value={draft.planType}
+                    onChange={(planType) => update({ planType })}
+                    options={planTypes.map((id) => ({
+                      value: id,
+                      label: t.docs.planTypes[id],
+                    }))}
+                  />
+                </Setting>
+                <Setting title={t.docs.lessonType}>
+                  <PopoverSelect
+                    inline
+                    alignRight
+                    ariaLabel={t.docs.lessonType}
+                    value={draft.lessonType}
+                    onChange={(lessonType) => update({ lessonType })}
+                    options={lessonTypes.map((id) => ({
+                      value: id,
+                      label: t.docs.lessonTypes[id],
+                    }))}
+                  />
+                </Setting>
+                <Setting title={t.docs.taskCount}>
+                  <PopoverSelect
+                    inline
+                    alignRight
+                    ariaLabel={t.docs.taskCount}
+                    value={String(draft.taskCount)}
+                    onChange={(value) => update({ taskCount: value === "4" ? 4 : 3 })}
+                    options={[3, 4].map((n) => ({
+                      value: String(n),
+                      label: t.docs.tasks(n),
+                    }))}
+                  />
+                </Setting>
+              </>
+            )}
+          </div>
 
-          <div role="radiogroup" aria-label={t.form.contentMode} className="grid grid-cols-2 gap-2">
-              <ModeRow
-                selected={draft.mode === "ai"}
-                onSelect={() => update({ mode: "ai" })}
-                icon={<SparkleIcon />}
-                title={t.form.modeAi}
-              />
-              <ModeRow
-                selected={draft.mode === "empty"}
-                onSelect={() => update({ mode: "empty" })}
-                icon={<PencilIcon />}
-                title={t.docs.modeEmpty}
-              />
-            </div>
+          {/* AI жазады / Бос жоба — небольшой переключатель */}
+          <SegmentedControl
+            ariaLabel={t.form.contentMode}
+            value={draft.mode}
+            onChange={(mode) => update({ mode })}
+            options={[
+              {
+                value: "ai",
+                label: t.form.modeAi,
+                icon: <SparkleIcon className="size-4" />,
+              },
+              {
+                value: "empty",
+                label: t.docs.modeEmpty,
+                icon: <PencilIcon className="size-4" />,
+              },
+            ]}
+          />
 
-          <details className="group rounded-xl bg-fill px-4 py-3">
-            <summary className="cursor-pointer text-subhead font-semibold">{t.docs.extra}</summary>
+          <details className="group px-1">
+            <summary className="flex min-h-11 cursor-pointer items-center text-subhead font-semibold text-label-2 hover:text-label">
+              {t.docs.extra}
+            </summary>
             <div className="mt-3 flex flex-col gap-2.5">
               <TextInput label={t.docs.teacher} value={draft.teacher} onChange={(teacher) => update({ teacher })} />
-              <TextInput label={t.docs.school} value={draft.school} onChange={(school) => update({ school })} />
+              {/* В шаблоне ҚМЖ строки «Мектеп» нет */}
+              {!isKmzh && <TextInput label={t.docs.school} value={draft.school} onChange={(school) => update({ school })} />}
               <TextInput label={t.docs.date} value={draft.date} onChange={(date) => update({ date })} placeholder="01.09.2026" />
             </div>
           </details>
@@ -291,17 +464,35 @@ export function DocumentWorkspace({ subject, kind }: { subject: Subject; kind: D
             </div>
           )}
         </form>
-
       </div>
 
       <section aria-label={t.docs.preview} className="min-w-0 lg:sticky lg:top-6">
         <h2 className="mb-3 text-subhead font-semibold text-label-2">{t.docs.preview}</h2>
-        {draft.mode === "ai" && !useSaved && (
+        {oldFormat && !loading && (
+          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl bg-orange/12 px-4 py-3">
+            <p className="flex-1 text-subhead">{t.docs.oldFormat}</p>
+            <Button type="button" onClick={() => generate()}>
+              <SparkleIcon />
+              {t.docs.remake}
+            </Button>
+          </div>
+        )}
+        {draft.mode === "ai" && !useSaved && !oldFormat && (
           <p className="mb-3 rounded-2xl bg-accent/10 px-4 py-3 text-subhead text-accent">{stale ? t.docs.stale : t.docs.previewHint}</p>
         )}
         {/* Лист бумаги: всегда белый с чёрным текстом, и в тёмной теме — как будет на печати */}
         <Sheet landscape={doc.landscape} html={body} dim={loading} />
       </section>
+    </div>
+  );
+}
+
+/** Строка списка настроек: название слева, значение справа */
+function Setting({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="flex min-h-12 items-center justify-between gap-3 pl-4 pr-2">
+      <span className="shrink-0 text-subhead text-label-2">{title}</span>
+      {children}
     </div>
   );
 }
@@ -315,25 +506,6 @@ function Field({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function ModeRow(props: { selected: boolean; onSelect: () => void; icon: ReactNode; title: string }) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={props.selected}
-      onClick={props.onSelect}
-      className={`flex items-center gap-2 rounded-xl border-2 px-3 py-3 text-left transition ${
-        props.selected ? "border-accent bg-accent/6" : "border-transparent bg-fill hover:border-separator"
-      }`}
-    >
-      <span className={`${props.selected ? "text-accent" : "text-label-2"}`}>{props.icon}</span>
-      <span>
-        <span className="block text-subhead font-bold">{props.title}</span>
-      </span>
-    </button>
-  );
-}
-
 function TextInput(props: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) {
   return (
     <label className="flex flex-col gap-1">
@@ -342,7 +514,7 @@ function TextInput(props: { label: string; value: string; onChange: (value: stri
         value={props.value}
         onChange={(e) => props.onChange(e.target.value)}
         placeholder={props.placeholder}
-        className="h-11 rounded-xl bg-surface px-3.5 text-body outline-none placeholder:text-label-3 focus:ring-4 focus:ring-accent/25"
+        className="h-11 rounded-xl border border-accent/30 bg-surface px-3.5 text-body outline-none transition placeholder:text-label-3 focus:border-accent focus:ring-4 focus:ring-accent/20"
       />
     </label>
   );

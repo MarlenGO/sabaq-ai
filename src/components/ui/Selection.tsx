@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toSelection } from "@/types/history";
 import { useT } from "@/i18n/client";
-import { TrashIcon } from "@/components/ui/Icons";
+import { CheckIcon, TrashIcon } from "@/components/ui/Icons";
 
 // Галочки в «Тарих» (у учителя и в админке): отметить строки или все сразу,
 // кнопка «Өшіру» появляется, только когда что-то отмечено.
@@ -47,11 +47,19 @@ export function useHistorySelection(endpoint: string) {
   return { selected, toggle, toggleAll, remove, busy, result };
 }
 
-/** Крупная галочка: квадрат 24 px, нажимать можно по площадке 44 px */
+/** Крупная галочка: кружок 24 px, нажимать можно по площадке 44 px */
 export function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
   return (
+    // Круглая галочка в стиле сайта: настоящий checkbox спрятан (клавиатура и экранный диктор работают), виден кружок
     <label className="flex size-11 shrink-0 cursor-pointer items-center justify-center">
-      <input type="checkbox" checked={checked} onChange={onChange} aria-label={label} className="size-6 cursor-pointer accent-accent" />
+      <input type="checkbox" checked={checked} onChange={onChange} aria-label={label} className="peer sr-only" />
+      <span
+        className={`flex size-6 items-center justify-center rounded-full border-2 transition peer-focus-visible:ring-2 peer-focus-visible:ring-accent/40 ${
+          checked ? "border-accent bg-accent text-white" : "border-label-3 bg-surface"
+        }`}
+      >
+        {checked && <CheckIcon className="size-3.5" />}
+      </span>
     </label>
   );
 }
@@ -66,6 +74,7 @@ export function SelectionBar(props: {
   const all = props.refs.length > 0 && props.refs.every((r) => selected.has(r));
   return (
     <div className="flex min-h-12 flex-wrap items-center gap-3">
+      {/* Такой же кружок, как у строк; подпись тоже нажимается */}
       <label className="flex cursor-pointer items-center gap-1 pr-2 text-callout font-semibold">
         <span className="flex size-11 items-center justify-center">
           <input
@@ -73,8 +82,15 @@ export function SelectionBar(props: {
             checked={all}
             onChange={() => toggleAll(props.refs)}
             disabled={props.refs.length === 0}
-            className="size-6 cursor-pointer accent-accent"
+            className="peer sr-only"
           />
+          <span
+            className={`flex size-6 items-center justify-center rounded-full border-2 transition peer-focus-visible:ring-2 peer-focus-visible:ring-accent/40 peer-disabled:opacity-40 ${
+              all ? "border-accent bg-accent text-white" : "border-label-3 bg-surface"
+            }`}
+          >
+            {all && <CheckIcon className="size-3.5" />}
+          </span>
         </span>
         {t.history.selectAll}
       </label>

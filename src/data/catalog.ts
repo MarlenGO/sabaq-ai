@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Dna,
   Earth,
+  Puzzle,
   Feather,
   FlaskConical,
   Grid3x3,
@@ -77,6 +78,8 @@ export const docIcon: Record<DocKind, string> = {
   kmzh: NotebookPen,
   test: ListTodo,
   bzhb: ClipboardCheck,
+  pisa: Earth,
+  worksheet: Puzzle,
 };
 
 /** Что можно создать: документ, вид презентации или игра. Адрес — /subject/<предмет>/<id> */

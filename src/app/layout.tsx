@@ -4,7 +4,7 @@ import { Nunito } from "next/font/google";
 import { getLocale } from "@/i18n/server";
 import { LocaleProvider } from "@/i18n/client";
 import { NavBar } from "@/components/ui/NavBar";
-import { preferencesScript } from "@/lib/preferences-script";
+import { installScript, preferencesScript } from "@/lib/preferences-script";
 import "./globals.css";
 
 // Шрифт сайта — Nunito: округлый и мягкий, легко читается.
@@ -26,6 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="kk" className={`${nunito.variable} h-full`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: preferencesScript }} />
+        <script dangerouslySetInnerHTML={{ __html: installScript }} />
       </head>
       <body className="min-h-full flex flex-col">
         {/* Язык сайта читается из cookie, а это данные запроса — поэтому внутри Suspense */}

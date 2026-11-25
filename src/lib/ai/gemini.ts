@@ -75,6 +75,11 @@ export async function generateJson<T>(schema: z.ZodType<T>, system: string, prom
       await new Promise((resolve) => setTimeout(resolve, pause));
       response = await send();
     }
+    // 429 — запросов в минуту больше, чем разрешает бесплатный тариф: ждём 5 с, не больше двух раз
+    for (let retry = 0; retry < 2 && response?.status === 429; retry++) {
+      await new Promise((resolve) => setTimeout(resolve, 5_000));
+      response = await send();
+    }
 
     if (!response) throw new AiError("unavailable", "Gemini не ответил");
     if (response.status === 429) throw new AiError("rate_limit", "Лимит бесплатных запросов Gemini");

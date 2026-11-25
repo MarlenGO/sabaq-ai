@@ -22,6 +22,15 @@ export const activitySchema = z.discriminatedUnion("type", [
     grade: z.number(),
     language: languageSchema,
     count: z.number(),
+    /** 2 — ҚМЖ по Word-шаблону; у старых ҚМЖ версии нет (их надо пересоздать) */
+    v: z.number().optional(),
+    section: z.string().optional(),
+    objective: z.string().optional(),
+    textbook: z.string().optional(),
+    value: z.string().optional(),
+    planType: z.string().optional(),
+    lessonType: z.string().optional(),
+    taskCount: z.number().optional(),
   }),
 ]);
 export type Activity = z.infer<typeof activitySchema>;
@@ -79,4 +88,12 @@ export type HistoryEntry =
       /** Средний процент правильных ответов */
       averagePercent: number;
     })
-  | (Base & { kind: "document"; docKind: DocKind; subject: Subject; language: Language; count: number });
+  | (Base & {
+      kind: "document";
+      docKind: DocKind;
+      subject: Subject;
+      language: Language;
+      count: number;
+      /** Что ещё нужно, чтобы открыть тот же ҚМЖ: v, section, objective, textbook, value */
+      extra: Record<string, string>;
+    });

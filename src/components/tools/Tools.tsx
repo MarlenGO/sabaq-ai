@@ -17,11 +17,12 @@ import { ArrowLeftIcon, ExpandIcon, SearchIcon } from "@/components/ui/Icons";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { fieldClass } from "@/components/ui/field";
 import { useLocale, useT } from "@/i18n/client";
+import { Timer } from "@/components/tools/Timer";
 
-// «Құралдар» — инструменты учителя физики: виртуальные опыты PhET,
-// справочник (формулы, постоянные, перевод единиц) и конвертер файлов.
+// «Құралдар» — инструменты учителя: виртуальные опыты PhET,
+// справочник (формулы, постоянные, перевод единиц), таймер для урока и конвертер файлов.
 
-type Tab = "phet" | "reference" | "convert";
+export type Tab = "phet" | "reference" | "timer" | "convert";
 
 export function Tools({ initialTab }: { initialTab: Tab }) {
   const t = useT();
@@ -36,11 +37,13 @@ export function Tools({ initialTab }: { initialTab: Tab }) {
         options={[
           { value: "phet", label: t.tools.phet },
           { value: "reference", label: t.tools.reference },
+          { value: "timer", label: t.tools.timer },
           { value: "convert", label: t.tools.convert },
         ]}
       />
       {tab === "phet" && <Phet />}
       {tab === "reference" && <Reference />}
+      {tab === "timer" && <Timer />}
       {tab === "convert" && <Convert />}
     </div>
   );
@@ -91,7 +94,6 @@ function Phet() {
   const used = sections.filter((sec) => simulations.some((s) => s.section === sec.id));
   return (
     <div className="flex flex-col gap-5">
-      <p className="text-body text-label-2">{t.tools.phetIntro}</p>
       <div role="radiogroup" aria-label={t.tools.section} className="flex flex-wrap gap-2">
         {[{ id: "all", name: { kk: t.tools.all, ru: t.tools.all } }, ...used].map((sec) => (
           <button
