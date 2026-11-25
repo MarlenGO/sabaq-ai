@@ -2,18 +2,20 @@ import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { connection } from "next/server";
 import { requireAdmin } from "@/lib/auth";
-import { loadErrors, loadLibrary, loadStats, loadUsage, loadUsers } from "@/lib/admin";
+import { loadErrors, loadHistory, loadLibrary, loadStats, loadUsage, loadUsers } from "@/lib/admin";
 import { dateOf, dateTimeOf } from "@/lib/dates";
 import { getT } from "@/i18n/server";
 import { Card } from "@/components/ui/Card";
 import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminLibrary } from "@/components/admin/AdminLibrary";
 import { CleanupButton } from "@/components/admin/CleanupButton";
+import { AdminHistory } from "@/components/admin/AdminHistory";
 import type { DeckType, Subject } from "@/types/topic-package";
 import type { GameId } from "@/games/registry";
 
-// Админка: учителя, расход AI, ошибки, статистика, библиотека. Только для роли admin.
-const tabs = ["users", "ai", "errors", "stats", "library"] as const;
+// Админка: учителя, тарих (уроки и игры всех учителей), расход AI, ошибки, статистика,
+// библиотека. Только для роли admin.
+const tabs = ["users", "history", "ai", "errors", "stats", "library"] as const;
 type Tab = (typeof tabs)[number];
 type T = Awaited<ReturnType<typeof getT>>;
 
@@ -53,14 +55,15 @@ async function Admin({ searchParams }: { searchParams: PageProps<"/admin">["sear
           </Link>
         ))}
       </nav>
-      {/* У библиотеки нет истории — это подборка уроков, её не чистим */}
-      {tab !== "library" && (
+      {/* Журналы AI чистятся кнопкой; уроки и игры — во вкладке «Тарих» */}
+      {(tab === "ai" || tab === "errors") && (
         <div className="mt-4">
           <CleanupButton target={tab} />
         </div>
       )}
       <div className="mt-4">
         {tab === "users" && <UsersTab selfId={admin.id} />}
+        {tab === "history" && <HistoryTab />}
         {tab === "ai" && <AiTab t={t} />}
         {tab === "errors" && <ErrorsTab t={t} />}
         {tab === "stats" && <StatsTab t={t} />}
@@ -77,6 +80,13 @@ async function UsersTab({ selfId }: { selfId: string }) {
     users.flatMap((u) => [u.created_at, u.last_seen_at]).flatMap((d) => (d ? [[d, dateOf(d)]] : [])),
   );
   return <AdminUsers users={users} invites={invites} defaultLimit={defaultLimit} selfId={selfId} dates={dates} />;
+}
+
+async function HistoryTab() {
+  const data = await loadHistory();
+  // Даты форматируем на сервере, как во вкладке учителей
+  const dates = Object.fromEntries([...data.lessons, ...data.rooms].map((x) => [x.at, dateOf(x.at)]));
+  return <AdminHistory {...data} dates={dates} />;
 }
 
 async function AiTab({ t }: { t: T }) {

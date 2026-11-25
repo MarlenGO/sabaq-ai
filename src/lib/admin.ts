@@ -147,42 +147,133 @@ export const isSelf = (admin: User, id: string) => admin.id === id;
 
 export const userQuery = (id: string) => `id=eq.${q(id)}`;
 
-// ——— Очистка истории (кнопка «Тарихты тазалау» на вкладках админки) ———
-// Удаляем только старое и служебное, чтобы база не разрасталась. Сегодняшние записи
-// не трогаем: по ним считается дневной лимит AI и идут сегодняшние игры.
+// ——— Очистка журналов AI (кнопка «Тарихты тазалау» на вкладках «AI» и «Қателер») ———
+// Сегодняшние записи не трогаем: по ним считается дневной лимит AI.
 
-export const cleanupTargets = ["users", "ai", "errors", "stats"] as const;
+export const cleanupTargets = ["ai", "errors"] as const;
 export type CleanupTarget = (typeof cleanupTargets)[number];
 
-const cleanupPlan = (target: CleanupTarget): { table: string; query: string }[] => {
-  const now = q(new Date().toISOString());
-  const today = q(startOfToday());
-  switch (target) {
-    // Истёкшие входы и использованные / просроченные ссылки для входа
-    case "users":
-      return [
-        { table: "sessions", query: `expires_at=lt.${now}` },
-        { table: "login_links", query: `or=(expires_at.lt.${now},used_at.not.is.null)` },
-      ];
-    // Журнал запросов к AI до сегодняшнего дня
-    case "ai":
-      return [{ table: "ai_usage", query: `at=lt.${today}` }];
-    // Все ошибки AI
-    case "errors":
-      return [{ table: "ai_usage", query: "ok=is.false" }];
-    // Прошлые QR-игры (с учениками и ответами — удалятся вместе с комнатой) и журнал действий
-    case "stats":
-      return [
-        { table: "rooms", query: `created_at=lt.${today}` },
-        { table: "activity", query: `at=lt.${today}` },
-      ];
-  }
-};
+const cleanupPlan = (target: CleanupTarget): { table: string; query: string }[] =>
+  target === "ai"
+    ? [{ table: "ai_usage", query: `at=lt.${q(startOfToday())}` }]
+    : [{ table: "ai_usage", query: "ok=is.false" }];
 
 /** Удалить историю вкладки; возвращает, сколько записей удалено */
 export async function cleanup(target: CleanupTarget) {
   let removed = 0;
   for (const { table, query } of cleanupPlan(target)) {
+    removed += await count(table, query);
+    await remove(table, query);
+  }
+  return removed;
+}
+
+// ——— Тарих: уроки (презентации и игры) и QR-игры всех учителей — админ может удалить ———
+
+export interface HistoryLesson {
+  id: string;
+  topic: string;
+  subject: string;
+  grade: number;
+  deckType: string;
+  empty: boolean;
+  featured: boolean;
+  ownerId: string;
+  ownerName: string;
+  at: string;
+}
+
+export interface HistoryRoom {
+  code: string;
+  game: string;
+  topic: string;
+  ownerId: string;
+  ownerName: string;
+  players: number;
+  at: string;
+}
+
+/** Последние уроки и QR-игры всех учителей (новые сверху) и список учителей для фильтра */
+export async function loadHistory() {
+  const [lessons, rooms, teachers] = await Promise.all([
+    select<{
+      id: string;
+      topic: string;
+      subject: string;
+      grade: number;
+      deck_type: string | null;
+      source: string;
+      featured: boolean;
+      owner_id: string;
+      updated_at: string;
+      users: { name: string } | null;
+    }>("lessons", "select=id,topic,subject,grade,deck_type,source,featured,owner_id,updated_at,users(name)&order=updated_at.desc&limit=1000"),
+    select<{
+      code: string;
+      owner_id: string | null;
+      lesson_id: string | null;
+      created_at: string;
+      game: string | null;
+      title: string | null;
+      users: { name: string } | null;
+      players: { count: number }[];
+    }>("rooms", "select=code,owner_id,lesson_id,created_at,game:data->>game,title:data->>title,users(name),players(count)&order=created_at.desc&limit=500"),
+    select<{ id: string; name: string }>("users", "select=id,name&order=name"),
+  ]);
+  return {
+    teachers,
+    lessons: lessons.map(
+      (l): HistoryLesson => ({
+        id: l.id,
+        topic: l.topic,
+        subject: l.subject,
+        grade: l.grade,
+        deckType: l.deck_type ?? "lesson",
+        empty: l.source === "empty",
+        featured: l.featured,
+        ownerId: l.owner_id,
+        ownerName: l.users?.name ?? "—",
+        at: l.updated_at,
+      }),
+    ),
+    rooms: rooms.map(
+      (r): HistoryRoom => ({
+        code: r.code,
+        game: r.game ?? "",
+        topic: r.title ?? "",
+        ownerId: r.owner_id ?? "",
+        ownerName: r.users?.name ?? "—",
+        players: r.players[0]?.count ?? 0,
+        at: r.created_at,
+      }),
+    ),
+  };
+}
+
+export type HistoryDelete = { action: "lesson"; id: string } | { action: "room"; code: string } | { action: "teacher"; userId: string };
+
+/**
+ * Удалить из истории: один урок (вместе с его QR-играми и записями журнала),
+ * одну QR-игру (ученики и ответы удаляются вместе с ней) или всю историю учителя
+ * (аккаунт остаётся). Возвращает, сколько записей удалено.
+ */
+export async function deleteHistory(target: HistoryDelete) {
+  const plan =
+    target.action === "lesson"
+      ? [
+          { table: "rooms", query: `lesson_id=eq.${q(target.id)}` },
+          { table: "activity", query: `data->>lessonId=eq.${q(target.id)}` },
+          { table: "lessons", query: `id=eq.${q(target.id)}` },
+        ]
+      : target.action === "room"
+        ? [{ table: "rooms", query: `code=eq.${q(target.code)}` }]
+        : [
+            { table: "rooms", query: `owner_id=eq.${q(target.userId)}` },
+            { table: "activity", query: `user_id=eq.${q(target.userId)}` },
+            { table: "lessons", query: `owner_id=eq.${q(target.userId)}` },
+          ];
+  let removed = 0;
+  for (const { table, query } of plan) {
     removed += await count(table, query);
     await remove(table, query);
   }
