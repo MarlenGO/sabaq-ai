@@ -1,20 +1,14 @@
-import { z } from "zod";
+import { historySelectionSchema } from "@/types/history";
 import { apiError } from "@/lib/api-errors";
-import { adminOrError, deleteHistory } from "@/lib/admin";
+import { adminOrError } from "@/lib/admin";
+import { deleteSelection } from "@/lib/storage/history-delete";
 
-// Проверка формата не даёт подставить в запрос к базе чужие условия
-const schema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("lesson"), id: z.string().regex(/^[a-f0-9]{12}$/) }),
-  z.object({ action: z.literal("room"), code: z.string().regex(/^\d{6}$/) }),
-  z.object({ action: z.literal("teacher"), userId: z.uuid() }),
-]);
-
-// POST /api/admin/history — админ удаляет урок, QR-игру или всю историю учителя
+// POST /api/admin/history — админ удаляет отмеченные уроки и QR-игры любых учителей
 export async function POST(request: Request) {
   const { admin, error } = await adminOrError();
   if (!admin) return error;
-  const parsed = schema.safeParse(await request.json().catch(() => null));
+  const parsed = historySelectionSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return apiError("badRequest", 400);
-  const removed = await deleteHistory(parsed.data);
+  const removed = await deleteSelection(parsed.data);
   return Response.json({ removed });
 }

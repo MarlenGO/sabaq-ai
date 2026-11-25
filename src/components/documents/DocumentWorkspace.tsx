@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import type { Language, Subject } from "@/types/topic-package";
 import { docSchemas, testCounts, type DocKind } from "@/types/documents";
@@ -61,7 +62,8 @@ export function DocumentWorkspace({ subject, kind }: { subject: Subject; kind: D
   const voice = useVoiceInput(draft.language, (text) => update({ topic: text }));
   const hasTopic = draft.topic.trim().length >= 2;
   const isTest = kind === "test";
-  const requestKey = `${draft.topic.trim().toLowerCase()}|${draft.grade}|${draft.language}${isTest ? `|${draft.count}` : ""}`;
+  const keyOf = (d: Draft) => `${d.topic.trim().toLowerCase()}|${d.grade}|${d.language}${isTest ? `|${d.count}` : ""}`;
+  const requestKey = keyOf(draft);
 
   // Сохранённый документ мог остаться от старой версии схемы — проверяем
   const saved = useMemo(() => {
@@ -83,19 +85,44 @@ export function DocumentWorkspace({ subject, kind }: { subject: Subject; kind: D
   });
   const body = toHtmlBody(doc);
 
-  const generate = () =>
+  const generate = (from: Draft = draft, again = false) =>
     startTransition(async () => {
       setError(null);
-      const { topic, grade, language, count } = draft;
+      const { topic, grade, language, count } = from;
       const response = await fetch("/api/documents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind, topic, grade, language, subject, count }),
+        body: JSON.stringify({ kind, topic, grade, language, subject, count, again }),
       }).catch(() => null);
       const data = await response?.json().catch(() => null);
-      if (response?.ok && data?.data) setResult({ for: requestKey, data: data.data });
+      if (response?.ok && data?.data) setResult({ for: keyOf(from), data: data.data });
       else setError(data?.error ?? t.form.netError);
     });
+
+  // Открыт из «Тарих» (?topic=…&grade=…&lang=…&count=…): подставляем тему и берём
+  // документ из кэша — AI второй раз не тратится. Адрес сразу очищаем.
+  const params = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const fromHistory = params.get("topic");
+  useEffect(() => {
+    if (!fromHistory) return;
+    const grade = Number(params.get("grade"));
+    const count = Number(params.get("count"));
+    const next: Draft = {
+      ...draft,
+      mode: "ai",
+      topic: fromHistory,
+      grade: grades.includes(grade) ? grade : draft.grade,
+      language: params.get("lang") === "ru" ? "ru" : "kk",
+      count: testCounts.includes(count as (typeof testCounts)[number]) ? count : draft.count,
+    };
+    setDraft(next);
+    router.replace(pathname);
+    if (result.for !== keyOf(next)) generate(next, true);
+    // Только при открытии из истории
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromHistory]);
 
   const fileName = `${title} — ${draft.topic.trim() || t.docs.document}`.replace(/[\\/:*?"<>|]+/g, " ").slice(0, 90);
 

@@ -1,20 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useTransition, type ReactNode } from "react";
-import type { HistoryDelete, HistoryLesson, HistoryRoom } from "@/lib/admin";
+import { useState, type ReactNode } from "react";
+import type { HistoryLesson, HistoryRoom } from "@/lib/admin";
 import type { DeckType, Subject } from "@/types/topic-package";
 import type { GameId } from "@/games/registry";
 import { useT } from "@/i18n/client";
 import { fieldClass } from "@/components/ui/field";
-import { SearchIcon, TrashIcon } from "@/components/ui/Icons";
+import { SearchIcon } from "@/components/ui/Icons";
+import { Checkbox, SelectionBar, useHistorySelection } from "@/components/ui/Selection";
 
 /** Сколько строк показываем сразу: остальное — через поиск или выбор учителя */
 const LIMIT = 100;
 
-// Тарих: уроки (презентации и игры) и QR-игры всех учителей. Админ может удалить
-// один урок, одну QR-игру или всю историю выбранного учителя — чтобы база не переполнялась.
+// Тарих: уроки (презентации и игры) и QR-игры всех учителей. Админ отмечает галочками
+// (или «Барлығын таңдау» — всё найденное) и удаляет, чтобы база не переполнялась.
 export function AdminHistory(props: {
   teachers: { id: string; name: string }[];
   lessons: HistoryLesson[];
@@ -24,11 +24,9 @@ export function AdminHistory(props: {
 }) {
   const t = useT();
   const h = t.admin.history;
-  const router = useRouter();
-  const [busy, startTransition] = useTransition();
   const [teacher, setTeacher] = useState("");
   const [query, setQuery] = useState("");
-  const [result, setResult] = useState<string | null>(null);
+  const selection = useHistorySelection("/api/admin/history");
   const needle = query.trim().toLowerCase();
 
   const lessons = props.lessons.filter(
@@ -37,21 +35,8 @@ export function AdminHistory(props: {
   const rooms = props.rooms.filter(
     (r) => (!teacher || r.ownerId === teacher) && (!needle || r.topic.toLowerCase().includes(needle)),
   );
-  const teacherName = props.teachers.find((x) => x.id === teacher)?.name ?? "";
-
-  const run = (target: HistoryDelete, question: string) => {
-    if (!window.confirm(question)) return;
-    startTransition(async () => {
-      const response = await fetch("/api/admin/history", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(target),
-      }).catch(() => null);
-      const data = await response?.json().catch(() => null);
-      setResult(response?.ok ? h.deleted(data?.removed ?? 0) : (data?.error ?? t.common.netError));
-      router.refresh();
-    });
-  };
+  // «Барлығын таңдау» берёт всё найденное, а не только первые 100 строк
+  const refs = [...lessons.map((l) => `lesson:${l.id}`), ...rooms.map((r) => `room:${r.code}`)];
 
   return (
     <div className="flex flex-col gap-5">
@@ -78,30 +63,14 @@ export function AdminHistory(props: {
         </label>
       </div>
 
-      {(teacher || result) && (
-        <div className="flex flex-wrap items-center gap-3">
-          {teacher && (
-            <DeleteButton
-              disabled={busy}
-              onClick={() =>
-                run(
-                  { action: "teacher", userId: teacher },
-                  h.confirmTeacher(teacherName, props.lessons.filter((l) => l.ownerId === teacher).length),
-                )
-              }
-            >
-              {h.deleteTeacher}
-            </DeleteButton>
-          )}
-          {result && <span className="text-subhead text-label-2">{result}</span>}
-        </div>
-      )}
+      <SelectionBar refs={refs} selection={selection} />
 
       <Section title={`${h.lessons} (${lessons.length})`}>
         {lessons.length === 0 && <Empty>{h.nothing}</Empty>}
         {lessons.slice(0, LIMIT).map((l) => (
           <Row
             key={l.id}
+            check={<Checkbox checked={selection.selected.has(`lesson:${l.id}`)} onChange={() => selection.toggle(`lesson:${l.id}`)} label={l.topic} />}
             title={l.topic}
             href={`/lesson/${l.id}?view=1`}
             openLabel={h.open}
@@ -114,11 +83,6 @@ export function AdminHistory(props: {
               l.ownerName,
               props.dates[l.at],
             ]}
-            action={
-              <DeleteButton disabled={busy} onClick={() => run({ action: "lesson", id: l.id }, h.confirmLesson(l.topic))}>
-                {h.delete}
-              </DeleteButton>
-            }
           />
         ))}
         {lessons.length > LIMIT && <Empty>{h.more(lessons.length - LIMIT)}</Empty>}
@@ -129,13 +93,9 @@ export function AdminHistory(props: {
         {rooms.slice(0, LIMIT).map((r) => (
           <Row
             key={r.code}
+            check={<Checkbox checked={selection.selected.has(`room:${r.code}`)} onChange={() => selection.toggle(`room:${r.code}`)} label={r.topic} />}
             title={`${t.games[r.game as GameId]?.title ?? r.game} · ${r.topic}`}
             details={[h.players(r.players), r.ownerName, props.dates[r.at]]}
-            action={
-              <DeleteButton disabled={busy} onClick={() => run({ action: "room", code: r.code }, h.confirmRoom)}>
-                {h.delete}
-              </DeleteButton>
-            }
           />
         ))}
         {rooms.length > LIMIT && <Empty>{h.more(rooms.length - LIMIT)}</Empty>}
@@ -153,7 +113,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Row(props: { title: string; details: (string | null | undefined)[]; href?: string; openLabel?: string; action: ReactNode }) {
+function Row(props: { title: string; details: (string | null | undefined)[]; href?: string; openLabel?: string; check: ReactNode }) {
   const text = (
     <>
       <span className="block truncate text-body font-semibold">{props.title}</span>
@@ -161,7 +121,8 @@ function Row(props: { title: string; details: (string | null | undefined)[]; hre
     </>
   );
   return (
-    <li className="flex flex-wrap items-center gap-3 px-4 py-3 sm:px-5">
+    <li className="flex items-center gap-2 py-2 pl-1 pr-4 sm:pr-5">
+      {props.check}
       {props.href ? (
         <Link href={props.href} title={props.openLabel} className="min-w-0 flex-1 hover:opacity-70">
           {text}
@@ -169,22 +130,7 @@ function Row(props: { title: string; details: (string | null | undefined)[]; hre
       ) : (
         <span className="min-w-0 flex-1">{text}</span>
       )}
-      {props.action}
     </li>
-  );
-}
-
-function DeleteButton({ children, disabled, onClick }: { children: ReactNode; disabled: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="inline-flex h-11 items-center gap-2 rounded-full bg-red/10 px-4 text-subhead font-semibold text-red transition hover:bg-red/15 disabled:opacity-50"
-    >
-      <TrashIcon />
-      {children}
-    </button>
   );
 }
 

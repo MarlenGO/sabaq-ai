@@ -5,7 +5,7 @@ import { listLessons } from "@/lib/storage/lessons";
 import { listPlayers, listRooms } from "@/lib/storage/rooms";
 
 // История собирается из трёх источников: уроки (когда созданы),
-// комнаты QR-игр (кто играл и как) и журнал (PPTX, игры на экране).
+// комнаты QR-игр (кто играл и как) и журнал (PPTX, игры на экране, документы).
 // Новые события — сверху.
 export async function buildHistory(userId: string): Promise<HistoryEntry[]> {
   const [lessons, rooms, activity] = await Promise.all([listLessons(userId), listRooms(userId), listActivity(userId)]);
@@ -17,6 +17,7 @@ export async function buildHistory(userId: string): Promise<HistoryEntry[]> {
       kind: "lesson",
       at: l.createdAt,
       lessonId: l.id,
+      ref: `lesson:${l.id}`,
       topic: l.topic,
       grade: l.grade,
       subject: l.subject,
@@ -26,9 +27,15 @@ export async function buildHistory(userId: string): Promise<HistoryEntry[]> {
   }
 
   for (const a of activity) {
+    const ref = `activity:${a.id}`;
+    if (a.type === "document") {
+      const { docKind, subject, topic, grade, language, count } = a;
+      entries.push({ kind: "document", at: a.at, ref, docKind, subject, topic, grade, language, count });
+      continue;
+    }
     const lesson = byId.get(a.lessonId);
     if (!lesson) continue; // урок удалён — событие не показываем
-    const base = { at: a.at, lessonId: a.lessonId, topic: lesson.topic, grade: lesson.grade };
+    const base = { at: a.at, ref, lessonId: a.lessonId, topic: lesson.topic, grade: lesson.grade };
     if (a.type === "pptx") {
       entries.push({ ...base, kind: "pptx", templateId: a.templateId });
     } else {
@@ -54,6 +61,7 @@ export async function buildHistory(userId: string): Promise<HistoryEntry[]> {
         grade: lesson.grade,
         game: room.game,
         roomCode: room.code,
+        ref: `room:${room.code}`,
         players: results.length,
         total,
         averagePercent,

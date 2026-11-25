@@ -6,9 +6,10 @@ import { currentUser } from "@/lib/auth";
 import { emptyDocument } from "@/documents/empty";
 import { documentKey, getCachedDocument, putCachedDocument } from "@/lib/storage/documents";
 import { hasQuota, tracked } from "@/lib/storage/usage";
+import { appendActivity } from "@/lib/storage/activity";
 
 // POST /api/documents — написать документ (ҚМЖ, тест, БЖБ) по теме.
-// Документ не сохраняем у учителя: страница показывает его и даёт скачать в Word.
+// Сам документ у учителя не храним: в «Тарих» пишем, по чему его найти в кэше.
 // Ответ AI кладём в общий кэш, чтобы та же тема у другого учителя была мгновенной.
 export async function POST(request: Request) {
   const user = await currentUser();
@@ -24,12 +25,14 @@ export async function POST(request: Request) {
   try {
     const key = documentKey(req);
     const cached = await getCachedDocument(req.kind, key);
-    if (cached) return Response.json({ data: cached, source: "ai", cached: true });
-
-    if (!(await hasQuota(user))) return apiError("dailyLimit", 429);
-    const data = await tracked(user.id, "document", () => generateDocument(req));
-    await putCachedDocument(key, data);
-    return Response.json({ data, source: "ai", cached: false });
+    const data = cached ?? (await hasQuota(user) ? await tracked(user.id, "document", () => generateDocument(req)) : null);
+    if (!data) return apiError("dailyLimit", 429);
+    if (!cached) await putCachedDocument(key, data);
+    if (!req.again) {
+      const { kind: docKind, subject, topic, grade, language, count } = req;
+      await appendActivity(user.id, { type: "document", at: new Date().toISOString(), docKind, subject, topic, grade, language, count });
+    }
+    return Response.json({ data, source: "ai", cached: Boolean(cached) });
   } catch (error) {
     return await errorResponse(error);
   }

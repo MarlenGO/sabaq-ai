@@ -7,23 +7,29 @@ import { dayKey, dayLabel, timeOf } from "@/lib/dates";
 import { Card } from "@/components/ui/Card";
 import { fieldClass } from "@/components/ui/field";
 import { BookIcon, GameIcon, SearchIcon, SlidesIcon } from "@/components/ui/Icons";
+import { LucideIcon } from "@/components/ui/LucideIcon";
+import { Checkbox, SelectionBar, useHistorySelection } from "@/components/ui/Selection";
+import { docPath } from "@/data/catalog";
+import { FileText } from "lucide-static";
 import type { Messages } from "@/i18n/kk";
 import { useT } from "@/i18n/client";
 
-// Лента истории: события по дням, фильтр по виду и поиск по теме.
-type Filter = "all" | "lesson" | "pptx" | "game";
+// Лента истории: события по дням, фильтр по виду, поиск по теме и удаление галочками.
+type Filter = "all" | "lesson" | "pptx" | "game" | "document";
 
 const filters: { value: Filter; label: (t: Messages) => string }[] = [
   { value: "all", label: (t) => t.history.all },
   { value: "lesson", label: (t) => t.history.lessons },
   { value: "pptx", label: (t) => t.history.presentations },
   { value: "game", label: (t) => t.history.games },
+  { value: "document", label: (t) => t.history.documents },
 ];
 
 export function HistoryList({ entries, today, yesterday }: { entries: HistoryEntry[]; today: string; yesterday: string }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const t = useT();
+  const selection = useHistorySelection("/api/history/delete");
 
   const q = query.trim().toLowerCase();
   const visible = entries.filter((e) => (filter === "all" || e.kind === filter) && (!q || e.topic.toLowerCase().includes(q)));
@@ -67,6 +73,8 @@ export function HistoryList({ entries, today, yesterday }: { entries: HistoryEnt
         </div>
       </div>
 
+      {visible.length > 0 && <SelectionBar refs={[...new Set(visible.map((e) => e.ref))]} selection={selection} />}
+
       {days.length === 0 ? (
         <Card className="p-8 text-center text-body text-label-2">
           {entries.length === 0 ? (
@@ -88,7 +96,14 @@ export function HistoryList({ entries, today, yesterday }: { entries: HistoryEnt
             </h2>
             <Card className="divide-y divide-separator overflow-hidden">
               {day.items.map((entry, i) => (
-                <Row key={`${entry.kind}-${entry.at}-${i}`} entry={entry} />
+                <div key={`${entry.kind}-${entry.at}-${i}`} className="flex items-center pl-1">
+                  <Checkbox
+                    checked={selection.selected.has(entry.ref)}
+                    onChange={() => selection.toggle(entry.ref)}
+                    label={entry.topic}
+                  />
+                  <Row entry={entry} />
+                </div>
               ))}
             </Card>
           </section>
@@ -101,7 +116,7 @@ export function HistoryList({ entries, today, yesterday }: { entries: HistoryEnt
 function Row({ entry }: { entry: HistoryEntry }) {
   const t = useT();
   // Из истории урок открывается только для просмотра; «Өзгерту» там же
-  const lessonHref = `/lesson/${entry.lessonId}?view=1`;
+  const lessonHref = entry.kind === "document" ? "" : `/lesson/${entry.lessonId}?view=1`;
   let icon: ReactNode;
   let tint: string;
   let title: string;
@@ -109,7 +124,15 @@ function Row({ entry }: { entry: HistoryEntry }) {
   let href = lessonHref;
   let action = t.common.open;
 
-  if (entry.kind === "lesson") {
+  if (entry.kind === "document") {
+    // Документ открывается на своей странице и берётся из кэша — без повторного AI
+    icon = <LucideIcon svg={FileText} className="size-5" />;
+    tint = "bg-teal";
+    title = t.history.documentMade(t.docs.kinds[entry.docKind].name);
+    detail = `${t.subjects[entry.subject]} · ${t.common.grade(entry.grade)}`;
+    const query = new URLSearchParams({ topic: entry.topic, grade: String(entry.grade), lang: entry.language, count: String(entry.count) });
+    href = `/subject/${entry.subject}/${docPath(entry.docKind)}?${query}`;
+  } else if (entry.kind === "lesson") {
     icon = <BookIcon />;
     tint = "bg-accent";
     title = t.history.lessonCreated;
@@ -135,7 +158,7 @@ function Row({ entry }: { entry: HistoryEntry }) {
   }
 
   return (
-    <Link href={href} className="flex items-center gap-3 px-4 py-3 transition hover:bg-fill/60">
+    <Link href={href} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-1 pr-4 transition hover:bg-fill/60">
       <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white ${tint}`}>{icon}</span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-body font-semibold">{entry.topic}</p>

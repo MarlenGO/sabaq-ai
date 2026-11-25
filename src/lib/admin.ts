@@ -250,32 +250,3 @@ export async function loadHistory() {
   };
 }
 
-export type HistoryDelete = { action: "lesson"; id: string } | { action: "room"; code: string } | { action: "teacher"; userId: string };
-
-/**
- * Удалить из истории: один урок (вместе с его QR-играми и записями журнала),
- * одну QR-игру (ученики и ответы удаляются вместе с ней) или всю историю учителя
- * (аккаунт остаётся). Возвращает, сколько записей удалено.
- */
-export async function deleteHistory(target: HistoryDelete) {
-  const plan =
-    target.action === "lesson"
-      ? [
-          { table: "rooms", query: `lesson_id=eq.${q(target.id)}` },
-          { table: "activity", query: `data->>lessonId=eq.${q(target.id)}` },
-          { table: "lessons", query: `id=eq.${q(target.id)}` },
-        ]
-      : target.action === "room"
-        ? [{ table: "rooms", query: `code=eq.${q(target.code)}` }]
-        : [
-            { table: "rooms", query: `owner_id=eq.${q(target.userId)}` },
-            { table: "activity", query: `user_id=eq.${q(target.userId)}` },
-            { table: "lessons", query: `owner_id=eq.${q(target.userId)}` },
-          ];
-  let removed = 0;
-  for (const { table, query } of plan) {
-    removed += await count(table, query);
-    await remove(table, query);
-  }
-  return removed;
-}

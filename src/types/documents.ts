@@ -81,5 +81,7 @@ export const documentRequestSchema = lessonRequestSchema.pick({ topic: true, gra
   kind: docKindSchema,
   /** Количество вопросов — только для теста */
   count: z.number().int().min(5).max(30).default(15),
+  /** Открыт заново из «Тарих» — в историю второй раз не пишем */
+  again: z.boolean().optional(),
 });
 export type DocumentRequest = z.infer<typeof documentRequestSchema>;
