@@ -9,7 +9,7 @@ import { Button, buttonClass } from "@/components/ui/Button";
 import { ArrowLeftIcon, PlusIcon, SparkleIcon, TrashIcon } from "@/components/ui/Icons";
 import { PopoverSelect } from "@/components/ui/Popover";
 import { confirmDelete } from "@/components/ui/field";
-import { LessonList, kmzhHref } from "@/components/plan/LessonList";
+import { LessonList, PLAN_CHANGED, kmzhHref } from "@/components/plan/LessonList";
 import type { Plan, PlanInput } from "@/types/plan";
 
 // «Жоспар» — КТП учителя. Три состояния:
@@ -53,6 +53,28 @@ export function PlanPage({ initialPlans }: { initialPlans: Plan[] }) {
     }, 1000);
     return () => clearTimeout(timer);
   }, [plans]);
+
+  // Next.js держит страницу в памяти: вернулись из ҚМЖ — список старый, без галочки.
+  // Эффект заново срабатывает при каждом показе страницы (и когда вкладка снова видна) —
+  // перечитываем планы из базы. Пока есть несохранённая правка, не трогаем.
+  const opened = useRef(false);
+  useEffect(() => {
+    const reload = async () => {
+      if (document.visibilityState !== "visible" || pending.current) return;
+      const response = await fetch("/api/plans").catch(() => null);
+      const data = await response?.json().catch(() => null);
+      if (!response?.ok || !Array.isArray(data?.plans) || pending.current) return;
+      setPlans(data.plans);
+    };
+    if (opened.current) reload();
+    opened.current = true;
+    document.addEventListener("visibilitychange", reload);
+    window.addEventListener(PLAN_CHANGED, reload);
+    return () => {
+      document.removeEventListener("visibilitychange", reload);
+      window.removeEventListener(PLAN_CHANGED, reload);
+    };
+  }, []);
 
   const changePlan = (patch: Partial<Plan>) => {
     if (!plan) return;

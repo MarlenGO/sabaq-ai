@@ -78,10 +78,11 @@ export async function NavBar() {
         {/* Внизу: предмет; размер текста, язык, тема; имя и значок админки; выход */}
         <div className="mt-auto flex flex-col gap-3 px-2">
           {user && <SubjectPicker initial={saved.success ? saved.data : ""} />}
+          {/* Тема и админка — квадраты одного размера у правого края, один под другим */}
           <div className="flex items-center gap-2">
-            <TextSizeControl up />
-            <LanguageSwitch up />
-            <ThemeToggle />
+            <TextSizeControl up grow />
+            <LanguageSwitch up grow />
+            <ThemeToggle large />
           </div>
           {user && (
             <div className="flex items-center justify-between gap-2">
@@ -91,7 +92,7 @@ export async function NavBar() {
                   href="/admin"
                   aria-label={t.nav.admin}
                   title={t.nav.admin}
-                  className="flex size-9 shrink-0 items-center justify-center rounded-full bg-fill text-label transition hover:bg-accent/15 hover:text-accent"
+                  className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-fill text-label transition hover:bg-accent/15 hover:text-accent"
                 >
                   <LucideIcon svg={ShieldCheck} className="size-5" />
                 </Link>

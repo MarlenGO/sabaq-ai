@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { connection } from "next/server";
 import { requireAdmin } from "@/lib/auth";
@@ -10,12 +9,14 @@ import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminLibrary } from "@/components/admin/AdminLibrary";
 import { CleanupButton } from "@/components/admin/CleanupButton";
 import { AdminHistory } from "@/components/admin/AdminHistory";
+import { AdminTabs } from "@/components/admin/AdminTabs";
+import { DB_LIMIT, dbJunk, loadDbStats } from "@/lib/admin-db";
 import type { DeckType, Subject } from "@/types/topic-package";
 import type { GameId } from "@/games/registry";
 
 // Админка: учителя, тарих (уроки и игры всех учителей), расход AI, ошибки, статистика,
-// библиотека. Только для роли admin.
-const tabs = ["users", "history", "ai", "errors", "stats", "library"] as const;
+// библиотека, база (размер таблиц и чистка мусора). Только для роли admin.
+const tabs = ["users", "history", "ai", "errors", "stats", "library", "db"] as const;
 type Tab = (typeof tabs)[number];
 type T = Awaited<ReturnType<typeof getT>>;
 
@@ -41,35 +42,32 @@ async function Admin({ searchParams }: { searchParams: PageProps<"/admin">["sear
 
   return (
     <>
-      <nav aria-label={t.admin.title} className="mt-6 flex flex-wrap gap-2">
-        {tabs.map((id) => (
-          <Link
-            key={id}
-            href={`/admin?tab=${id}`}
-            aria-current={id === tab ? "page" : undefined}
-            className={`flex h-11 items-center rounded-full px-5 text-subhead font-semibold transition ${
-              id === tab ? "bg-accent text-white" : "bg-fill text-label hover:bg-accent/15"
-            }`}
-          >
-            {t.admin.tabs[id]}
-          </Link>
-        ))}
-      </nav>
+      <AdminTabs tabs={tabs.map((id) => ({ id, name: t.admin.tabs[id] }))} current={tab} label={t.admin.title} />
       {/* Журналы AI чистятся кнопкой; уроки и игры — во вкладке «Тарих» */}
       {(tab === "ai" || tab === "errors") && (
         <div className="mt-4">
           <CleanupButton target={tab} />
         </div>
       )}
-      <div className="mt-4">
-        {tab === "users" && <UsersTab selfId={admin.id} />}
-        {tab === "history" && <HistoryTab />}
-        {tab === "ai" && <AiTab t={t} />}
-        {tab === "errors" && <ErrorsTab t={t} />}
-        {tab === "stats" && <StatsTab t={t} />}
-        {tab === "library" && <AdminLibrary lessons={await loadLibrary()} />}
-      </div>
+      {/* Своя граница на каждую вкладку: вкладки и заготовка видны сразу, данные из базы — следом */}
+      <Suspense key={tab} fallback={<div className="mt-4 h-96 animate-pulse rounded-2xl bg-fill" />}>
+        <TabContent tab={tab} selfId={admin.id} t={t} />
+      </Suspense>
     </>
+  );
+}
+
+async function TabContent({ tab, selfId, t }: { tab: Tab; selfId: string; t: T }) {
+  return (
+    <div className="mt-4">
+      {tab === "users" && <UsersTab selfId={selfId} />}
+      {tab === "history" && <HistoryTab />}
+      {tab === "ai" && <AiTab t={t} />}
+      {tab === "errors" && <ErrorsTab t={t} />}
+      {tab === "stats" && <StatsTab t={t} />}
+      {tab === "library" && <AdminLibrary lessons={await loadLibrary()} />}
+      {tab === "db" && <DbTab t={t} />}
+    </div>
   );
 }
 
@@ -180,6 +178,71 @@ async function StatsTab({ t }: { t: T }) {
         <Bars title={t.admin.statSubjects} rows={s.bySubject.map((r) => ({ label: t.subjects[r.key as Subject] ?? r.key, n: r.n }))} />
         <Bars title={t.admin.statGames} rows={s.byGame.map((r) => ({ label: t.games[r.key as GameId]?.title ?? r.key, n: r.n }))} />
       </div>
+    </div>
+  );
+}
+
+/** 1234567 → «1,2 МБ» */
+const sizeOf = (bytes: number) =>
+  bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} КБ` : `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} МБ`;
+
+async function DbTab({ t }: { t: T }) {
+  const s = await loadDbStats();
+  const tables = [...s.tables].sort((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0) || b.rows - a.rows);
+  return (
+    <div className="flex flex-col gap-6">
+      {s.total !== null ? (
+        <Card className="p-5">
+          <p className="text-subhead text-label-2">{t.admin.db.used}</p>
+          <p className="mt-1 text-large font-bold tabular-nums">{sizeOf(s.total)}</p>
+          <p className="mt-0.5 text-footnote text-label-2">{t.admin.db.of(sizeOf(DB_LIMIT))}</p>
+          <span className="mt-3 block h-2 overflow-hidden rounded-full bg-fill">
+            <span className="block h-full rounded-full bg-accent" style={{ width: `${Math.min(100, Math.max(1, (s.total / DB_LIMIT) * 100))}%` }} />
+          </span>
+        </Card>
+      ) : (
+        <p className="rounded-2xl bg-orange/10 p-4 text-subhead text-orange">{t.admin.db.noSizes}</p>
+      )}
+
+      <section>
+        <h2 className="mb-2 text-title3 font-semibold">{t.admin.db.junkTitle}</h2>
+        <Card className="divide-y divide-separator">
+          {dbJunk.map((id) => (
+            <div key={id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+              <div className="min-w-0 flex-1 basis-64">
+                <p className="text-body font-semibold">{t.admin.db.junk[id][0]}</p>
+                <p className="text-subhead text-label-2">{t.admin.db.junk[id][1]}</p>
+              </div>
+              <span className="text-subhead font-semibold tabular-nums">{t.admin.db.found(s.junk[id])}</span>
+              {s.junk[id] > 0 && <CleanupButton target={id} db />}
+            </div>
+          ))}
+        </Card>
+      </section>
+
+      <Card className="overflow-hidden">
+        <table className="w-full text-left text-subhead">
+          <thead className="bg-fill text-footnote text-label-2">
+            <tr>
+              <th className="px-4 py-2 font-semibold">{t.admin.db.table}</th>
+              <th className="px-4 py-2 text-right font-semibold">{t.admin.db.rows}</th>
+              {s.total !== null && <th className="px-4 py-2 text-right font-semibold">{t.admin.db.size}</th>}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-separator">
+            {tables.map((row) => (
+              <tr key={row.name}>
+                <td className="px-4 py-2.5">
+                  <p className="font-semibold">{t.admin.db.tables[row.name][0]}</p>
+                  {t.admin.db.tables[row.name][1] && <p className="text-footnote text-label-2">{t.admin.db.tables[row.name][1]}</p>}
+                </td>
+                <td className="px-4 py-2.5 text-right tabular-nums">{row.rows}</td>
+                {s.total !== null && <td className="px-4 py-2.5 text-right tabular-nums">{row.bytes === null ? "—" : sizeOf(row.bytes)}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
     </div>
   );
 }

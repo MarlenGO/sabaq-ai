@@ -19,7 +19,7 @@ const SYSTEM = `Сен — Қазақстан мектебі мұғалімін�
 - Оқу мақсатының коды болса (мысалы «8.3.2.17»), кодымен бірге көшір. Бірнеше мақсат болса — бәрін « ; » арқылы бір жолға жаз.
 - Тоқсан (quarter): файлда «I тоқсан», «2-тоқсан», «3 четверть» сияқты белгі болса — 1–4. Белгісіз болса — 0.
 - Күні (date): файлда қалай жазылса, солай. Жоқ болса — бос жол.
-- Сағат саны 2 болса да — бір сабақ (бір жол).
+- Бір жолда бірнеше сабақ болса (№ ұяшығында «21-22» сияқты аралық немесе сағат саны 2, 3) — сол сабақты сонша рет қатарынан қайтала: әр сағатқа бөлек ҚМЖ жазылады. Ешбір жолды өткізіп жіберме.
 - БЖБ (СОР, бөлім бойынша жиынтық бағалау) — kind "bzhb", ТЖБ (СОЧ, тоқсандық) — kind "tzhb", қалғаны — "lesson". БЖБ/ТЖБ жеке жол болса ғана бөлек сабақ ет; тақырыппен бірге жазылса — "lesson" және тақырыпты өзгертпе.
 - Кесте тақырыптарын («Тақырып», «Тема урока», «№»), қолтаңбаларды, «Келісемін», «Бекітемін» сияқты жолдарды сабақ етпе.
 - Пән (subject) — тізімнен: ${subjectSchema.options.join(", ")}. Табылмаса — "other".
@@ -33,6 +33,14 @@ const plain = (text: string) =>
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 
+/** Gemini не всегда отмечает БЖБ/ТЖБ — проверяем по словам в теме */
+function kindOf(topic: string, kind: PlanLesson["kind"]): PlanLesson["kind"] {
+  const text = topic.trim().toLowerCase();
+  if (/тоқсандық\s+жиын[дт]?ық|^тжб|^соч|за\s+(\d\s*)?четверть/.test(text)) return "tzhb";
+  if (/^(бжб|сор|бөлім\s+бойынша\s+жиын[дт]?ық|суммативное\s+оценивание\s+за\s+раздел)/.test(text)) return "bzhb";
+  return kind;
+}
+
 export async function parsePlan(text: string, fileName: string): Promise<PlanInput> {
   const ai = await generateJson(planAiSchema, SYSTEM, `Файл: ${fileName}\n\n${text.slice(0, MAX_TEXT)}`);
   const source = plain(text);
@@ -45,7 +53,7 @@ export async function parsePlan(text: string, fileName: string): Promise<PlanInp
       section: lesson.section.trim(),
       topic: lesson.topic.trim(),
       objective: lesson.objective.trim(),
-      kind: lesson.kind,
+      kind: kindOf(lesson.topic, lesson.kind),
       // Тема должна быть в файле — иначе AI мог её выдумать или исказить
       ...(source.includes(plain(lesson.topic)) ? {} : { unsure: true }),
     }));

@@ -95,5 +95,10 @@ export function remove(table: string, query: string) {
   return request<void>("DELETE", `${table}?${query}`);
 }
 
+/** Вызвать функцию базы (create function … в schema.sql): rpc("db_sizes") */
+export function rpc<T>(name: string, args: object = {}) {
+  return request<T>("POST", `rpc/${name}`, args);
+}
+
 /** Нарушена уникальность (например, ученик второй раз ответил на тот же вопрос) */
 export const isDuplicate = (error: unknown) => error instanceof DbError && error.code === "23505";

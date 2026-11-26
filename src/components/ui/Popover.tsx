@@ -29,6 +29,8 @@ export function PopoverSelect<T extends string>(props: {
   up?: boolean;
   /** Прижать список к правому краю кнопки — для панели сверху справа */
   alignRight?: boolean;
+  /** Крупная кнопка, растянутая на свободное место — для меню слева */
+  grow?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -52,12 +54,14 @@ export function PopoverSelect<T extends string>(props: {
 
   const button = props.inline
     ? "min-h-11 rounded-lg px-2 text-callout font-semibold text-accent hover:bg-accent/10"
-    : props.full
-      ? "min-h-11 w-full rounded-xl bg-fill px-4 py-2 text-callout font-semibold hover:bg-accent/15"
-      : "h-9 rounded-full bg-fill pl-3 pr-2 text-footnote font-semibold hover:bg-accent/15";
+    : props.grow
+      ? "h-11 w-full rounded-xl bg-fill px-2.5 text-subhead font-semibold hover:bg-accent/15"
+      : props.full
+        ? "min-h-11 w-full rounded-xl bg-fill px-4 py-2 text-callout font-semibold hover:bg-accent/15"
+        : "h-9 rounded-full bg-fill pl-3 pr-2 text-footnote font-semibold hover:bg-accent/15";
 
   return (
-    <div ref={box} className={`relative ${props.full ? "w-full" : ""}`}>
+    <div ref={box} className={`relative ${props.full ? "w-full" : props.grow ? "flex-auto" : ""}`}>
       <button
         type="button"
         aria-haspopup="listbox"

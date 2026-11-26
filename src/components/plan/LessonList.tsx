@@ -17,8 +17,10 @@ import type { Plan, PlanLesson } from "@/types/plan";
 
 /** Адрес ҚМЖ по уроку плана: поля подставятся сами (как при открытии из «Тарих») */
 export function kmzhHref(plan: Plan, lesson: PlanLesson) {
+  // «Изопроцестер. БЖБ№3» — в ҚМЖ идёт только сама тема, без пометки о БЖБ
+  const topic = lesson.topic.replace(/[\s.,;:–—-]*(БЖБ|СОР)\s*№?\s*\d*\s*$/iu, "").trim() || lesson.topic;
   const params = new URLSearchParams({
-    topic: lesson.topic,
+    topic,
     grade: String(plan.grade),
     lang: plan.language,
     section: lesson.section,
@@ -32,6 +34,9 @@ export function kmzhHref(plan: Plan, lesson: PlanLesson) {
   if (lesson.kmzhAt) params.set("done", "1");
   return `/subject/${plan.subject}/${docPath("kmzh")}?${params}`;
 }
+
+/** Событие «по уроку сделан ҚМЖ» — открытый «Жоспар» перечитывает планы */
+export const PLAN_CHANGED = "sabaq-plan-changed";
 
 export const newLessonId = () => Math.random().toString(36).slice(2, 10);
 

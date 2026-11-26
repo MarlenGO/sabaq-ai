@@ -155,3 +155,15 @@ alter table answers enable row level security;
 alter table activity enable row level security;
 alter table ai_usage enable row level security;
 alter table plans enable row level security;
+
+-- Размер таблиц для вкладки «БД» в админке (вызывается через REST: rpc/db_sizes).
+-- Только для секретного ключа сервера: у anon и authenticated права нет.
+create or replace function db_sizes()
+returns table (name text, bytes bigint, total bigint)
+language sql stable security definer set search_path = public as $$
+  select c.relname::text, pg_total_relation_size(c.oid), pg_database_size(current_database())
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relkind = 'r'
+$$;
+revoke execute on function db_sizes() from public, anon, authenticated;
+grant execute on function db_sizes() to service_role;

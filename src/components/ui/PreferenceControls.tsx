@@ -11,7 +11,7 @@ import { LucideIcon } from "@/components/ui/LucideIcon";
 import { PopoverSelect } from "@/components/ui/Popover";
 
 // Размер текста — значок «Аа» на кнопке, в списке буква «А» своего размера и подпись словами.
-export function TextSizeControl({ up = false }: { up?: boolean }) {
+export function TextSizeControl({ up = false, grow = false }: { up?: boolean; grow?: boolean }) {
   const [size, setSize] = useTextSize();
   const t = useT();
   const option = (value: "m" | "l" | "xl", em: string, label: string) => ({
@@ -29,8 +29,9 @@ export function TextSizeControl({ up = false }: { up?: boolean }) {
   return (
     <PopoverSelect
       up={up}
+      grow={grow}
       ariaLabel={t.nav.textSize}
-      trigger={<LucideIcon svg={ALargeSmall} className="size-5" />}
+      trigger={<LucideIcon svg={ALargeSmall} className={grow ? "size-6" : "size-5"} />}
       value={size ?? "m"}
       onChange={setSize}
       options={[option("m", "0.85em", t.nav.textM), option("l", "1em", t.nav.textL), option("xl", "1.2em", t.nav.textXl)]}
@@ -38,8 +39,9 @@ export function TextSizeControl({ up = false }: { up?: boolean }) {
   );
 }
 
-// Тема — только значок: луна включает тёмную, солнце — светлую
-export function ThemeToggle() {
+// Тема — только значок: луна включает тёмную, солнце — светлую.
+// large — квадрат 44px, как соседние кнопки в меню слева
+export function ThemeToggle({ large = false }: { large?: boolean }) {
   const [theme, setTheme] = useTheme();
   const t = useT();
   const isDark = theme === "dark";
@@ -51,7 +53,7 @@ export function ThemeToggle() {
       onClick={() => setTheme(isDark ? "light" : "dark")}
       aria-label={label}
       title={label}
-      className="flex size-9 shrink-0 items-center justify-center rounded-full bg-fill text-label transition hover:bg-accent/15"
+      className={`flex shrink-0 items-center justify-center bg-fill text-label transition hover:bg-accent/15 ${large ? "size-11 rounded-xl" : "size-9 rounded-full"}`}
     >
       {/* До загрузки настроек показываем пустое место того же размера */}
       {theme === null ? <span className="h-[1.25em] w-[1.25em]" /> : isDark ? <SunIcon /> : <MoonIcon />}
@@ -60,12 +62,13 @@ export function ThemeToggle() {
 }
 
 // Язык сайта: подписи на своём языке, чтобы их узнал и тот, кто не понимает текущий
-export function LanguageSwitch({ up = false, alignRight = false }: { up?: boolean; alignRight?: boolean }) {
+export function LanguageSwitch({ up = false, alignRight = false, grow = false }: { up?: boolean; alignRight?: boolean; grow?: boolean }) {
   const locale = useLocale();
   const t = useT();
   return (
     <PopoverSelect
       up={up}
+      grow={grow}
       alignRight={alignRight}
       ariaLabel={t.nav.language}
       value={locale}

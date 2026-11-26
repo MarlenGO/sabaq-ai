@@ -24,6 +24,7 @@ import { ArrowLeftIcon, MicIcon, PencilIcon, SparkleIcon } from "@/components/ui
 import { PopoverSelect } from "@/components/ui/Popover";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { subjectColors } from "@/components/home/SubjectBadge";
+import { PLAN_CHANGED } from "@/components/plan/LessonList";
 
 type Mode = "ai" | "empty";
 
@@ -211,7 +212,8 @@ export function DocumentWorkspace({ subject, kind }: { subject: Subject; kind: D
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lesson: lessonId }),
-      });
+        // «Жоспар» может быть уже открыт (вернулись, пока ҚМЖ готовился) — пусть перечитает
+      }).then(() => window.dispatchEvent(new Event(PLAN_CHANGED)));
     if (isKmzh && params.get("v") !== "2") setOldFormat(true);
     else if (fromPlan) generate(next, false, markLesson);
     else if (result.for !== keyOf(next)) generate(next, true);
