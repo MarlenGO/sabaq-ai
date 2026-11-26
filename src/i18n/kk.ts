@@ -1,6 +1,6 @@
 import type { GameId } from "@/games/registry";
 import type { DocKind } from "@/types/documents";
-import type { DeckType, Language, Subject } from "@/types/topic-package";
+import type { DeckType, Language, LookId, Subject } from "@/types/topic-package";
 
 // Тексты интерфейса на казахском. Это «эталон»: русский словарь (ru.ts)
 // обязан иметь ровно те же ключи — иначе TypeScript покажет ошибку.
@@ -92,12 +92,34 @@ export const kk = {
     attestation: { name: "Аттестация / портфолио", description: "Өзім туралы, ұстаным, курстар, нәтижелер" },
   } satisfies Record<DeckType, { name: string; description: string }>,
   templates: {
-    classic: { name: "Классика", description: "Ақ фон, қатаң — ашық сабаққа" },
-    science: { name: "Ғылым", description: "Көк түстер — физика, химия" },
-    nature: { name: "Табиғат", description: "Жасыл түстер — биология, география" },
-    history: { name: "Тарих", description: "Жылы бежевый түстер — тарих, әдебиет" },
-    dark: { name: "Қараңғы", description: "Қараңғы фон — жарық сыныпта проекторға" },
+    beles: { name: "Көк пен сары", description: "Қою көк пен сары" },
+    syzba: { name: "Көгілдір мен маржан", description: "Көгілдір мен маржан" },
+    journal: { name: "Жасыл мен қыша", description: "Қою жасыл мен қыша сары" },
+    mosaic: { name: "Күлгін мозаика", description: "Ақшыл күлгін фон" },
+    official: { name: "Ресми көк", description: "Қою көк пен алтын" },
+    attest: { name: "Шие мен графит", description: "Шие түс пен графит" },
+    method: { name: "Сұр мен болат көк", description: "Сұр-қара мен болат көк" },
+    classic: { name: "Ақ пен көк", description: "Ақ фон, көк тақырып" },
+    science: { name: "Қою көк", description: "Қою көк фон, ақ мәтін" },
+    nature: { name: "Жасыл", description: "Ақшыл-жасыл фон" },
+    history: { name: "Бежевый", description: "Жылы бежевый фон" },
+    dark: { name: "Қараңғы", description: "Қараңғы фон, сары тақырып" },
+    festive: { name: "Көк пен алтын", description: "Ақ фон, қою көк пен алтын" },
+    corporate: { name: "Көгілдір", description: "Ақ фон, көгілдір" },
+    academic: { name: "Шие", description: "Ақ фон, шие түс" },
+    warm: { name: "Қызғылт сары", description: "Жылы фон, қызғылт сары" },
+    calm: { name: "Жұмсақ көк", description: "Ақшыл фон, жұмсақ көк" },
+    elegant: { name: "Қою жасыл", description: "Ақ фон, қою жасыл мен алтын" },
   } as Record<string, { name: string; description: string }>,
+  looks: {
+    beles: { name: "Белес", description: "Қою көк пен сары: карточкалар, белгіше шеңберлері, кезеңдер" },
+    syzba: { name: "Сызба", description: "Инфографика: слайд нөмірі, уақыт сызығы, түсті жолақ" },
+    journal: { name: "Журнал", description: "Ғылыми журнал: үлкен сандар, жіңішке сызықтар" },
+    mosaic: { name: "Мозаика", description: "Түрлі түсті плиткалар — сынып сағаты, ойын сабақ" },
+    official: { name: "Ресми есеп", description: "Педкеңес, есеп: көк жолақ, алтын сызық, бөлімдер" },
+    attest: { name: "Аттестация", description: "Портфолио: қос жақтау, фото орны, мөр" },
+    method: { name: "Әдістемелік кеңес", description: "Баяндама: сол жақта нөмірі бар жолақ" },
+  } satisfies Record<Exclude<LookId, "classic">, { name: string; description: string }>,
   home: {
     title: "Қай пәннен сабақ дайындаймыз?",
     search: "Іздеу…",
@@ -204,13 +226,14 @@ export const kk = {
     demo: "Демо-режим.",
     demoText:
       "AI кілті әлі қосылмаған, сондықтан мазмұны — мысал (Ньютон заңы). Кілтті қосқаннан кейін жаңа тақырыптар үшін нағыз мазмұн жасалады.",
-    makeGame: "Осы тақырыпқа ойын жасау",
     empty: "Бос жоба.",
     emptyText: "Мәтіндерді өзіңіз жазыңыз немесе әр слайд пен сұрақтың жанындағы «AI» батырмасын басыңыз.",
-    makeSlides: "Осы тақырыпқа презентация",
-    chooseTemplate: "Стильді таңдаңыз",
+    chooseTemplate: "Слайд түсі",
+    chooseLook: "Дизайн",
+    chooseFont: "Шрифт",
+    fontByDesign: "Дизайн бойынша",
     chooseType: "Презентация түрі",
-    typeHint: "Түрі — слайдтардың құрылымы мен мәтіні, стиль — тек түстер мен безендіру.",
+    typeHint: "Түрі — слайдтардың құрылымы мен мәтіні. Дизайн мен түсін төменнен таңдайсыз.",
     saved: "Сақталды",
     saving: "Сақталуда…",
     invalid: "Бос өрістерді толтырыңыз — содан кейін өзі сақталады",
@@ -269,6 +292,7 @@ export const kk = {
     questionHint: "AI осы сұрақты жаңасымен ауыстырады",
     statementHint: "AI осы тұжырымды жаңасымен ауыстырады",
     jeopardyHint: "AI осы сұрақ пен жауапты жаңасымен ауыстырады",
+    fillSlide: "Осы слайдты AI-мен толтыру",
     fillAll: "Барлық слайдты AI-мен толтыру",
     fillAllHint: "AI осы презентацияның барлық слайдын тақырып бойынша толтырады",
   },
@@ -487,7 +511,7 @@ export const kk = {
     yesterday: "Кеше",
     lessonCreated: "Сабақ жасалды",
     pptxDownloaded: "Презентация жүктелді",
-    templateOf: (name: string) => `«${name}» стилі`,
+    templateOf: (name: string) => `түсі: ${name}`,
     playedOnScreen: (game: string) => `${game} ойналды · экранда`,
     viaQr: (game: string) => `${game} · QR арқылы`,
     playersAverage: (players: number, percent: number) => `${players} оқушы · орташа нәтиже ${percent}%`,

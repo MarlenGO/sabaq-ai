@@ -6,15 +6,17 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { topicPackageSchema, type TopicPackage } from "@/types/topic-package";
 import type { GameId } from "@/games/registry";
 import { useT } from "@/i18n/client";
-import { getTemplate } from "@/slides/templates";
+import { templateOf } from "@/slides/templates";
+import { LookPicker } from "@/components/slides/LookPicker";
 import { Card } from "@/components/ui/Card";
-import { ArrowLeftIcon, CheckIcon, EyeIcon, GameIcon, PencilIcon, SlidesIcon } from "@/components/ui/Icons";
+import { ArrowLeftIcon, CheckIcon, EyeIcon, PencilIcon } from "@/components/ui/Icons";
 import { Button, buttonClass } from "@/components/ui/Button";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { SlideEditor } from "@/components/slides/SlideEditor";
 import { SlidePreview } from "@/components/slides/SlidePreview";
 import { DownloadPptxButton } from "@/components/slides/DownloadPptxButton";
 import { TemplatePicker } from "@/components/slides/TemplatePicker";
+import { FontPicker } from "@/components/slides/FontPicker";
 import { DeckTypePicker, FillDeckButton } from "@/components/slides/DeckTypePicker";
 import { GamesPanel } from "./GamesPanel";
 import { AiProvider } from "./AiButton";
@@ -24,6 +26,10 @@ type Mode = "edit" | "preview";
 type SaveState = "saved" | "saving" | "invalid" | "error";
 
 const SAVE_DELAY_MS = 800;
+
+/** Полоса с переключателем режима: прилипает к верху при прокрутке */
+const barClass =
+  "sticky top-14 z-40 -mx-4 flex flex-wrap items-center gap-3 border-b border-separator bg-bg/85 px-4 py-3 backdrop-blur-xl";
 
 interface LessonWorkspaceProps {
   initial: TopicPackage;
@@ -50,7 +56,6 @@ export function LessonWorkspace({ initial, tab, readOnly, copyable, game, aiEnab
   const [editMode, setMode] = useState<Mode>("preview");
   const mode: Mode = readOnly ? "preview" : editMode;
   const base = `/lesson/${lesson.id}`;
-  const otherTab = tab === "slides" ? "games" : "slides";
   const [save, setSave] = useState<SaveState>("saved");
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -77,6 +82,20 @@ export function LessonWorkspace({ initial, tab, readOnly, copyable, game, aiEnab
       setSave(response?.ok ? "saved" : "error");
     }, SAVE_DELAY_MS);
   };
+
+  // «Конструктор / Алдын ала көру»: у презентации — под кнопкой «PPTX жүктеу», у игр — сверху
+  const modeSwitch = (
+    <SegmentedControl
+      size="lg"
+      ariaLabel={t.common.mode}
+      value={mode}
+      onChange={setMode}
+      options={[
+        { value: "edit", label: t.common.edit, icon: <PencilIcon /> },
+        { value: "preview", label: t.common.preview, icon: <EyeIcon /> },
+      ]}
+    />
+  );
 
   return (
     <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-24 pt-6 sm:px-8">
@@ -119,29 +138,7 @@ export function LessonWorkspace({ initial, tab, readOnly, copyable, game, aiEnab
           {t.lesson.readOnly}
         </p>
       ) : (
-        <div className="sticky top-14 z-40 -mx-4 mt-6 flex flex-wrap items-center justify-between gap-3 border-b border-separator bg-bg/85 px-4 py-3 backdrop-blur-xl">
-          <SegmentedControl
-            size="lg"
-            ariaLabel={t.common.mode}
-            value={mode}
-            onChange={setMode}
-            options={[
-              { value: "edit", label: t.common.edit, icon: <PencilIcon /> },
-              { value: "preview", label: t.common.preview, icon: <EyeIcon /> },
-            ]}
-          />
-          {/* Вторая часть урока — тихой ссылкой: к презентации можно добавить игру.
-              Со страницы игры ссылку на презентацию не показываем — учитель делает игру */}
-          {tab === "slides" && (
-          <Link
-            href={`${base}?tab=${otherTab}`}
-            className="inline-flex h-11 items-center gap-1.5 rounded-xl px-3 text-subhead font-semibold text-accent hover:bg-accent/10"
-          >
-            {otherTab === "games" ? <GameIcon /> : <SlidesIcon />}
-            {otherTab === "games" ? t.lesson.makeGame : t.lesson.makeSlides}
-          </Link>
-          )}
-        </div>
+        tab === "games" && <div className={`${barClass} mt-6`}>{modeSwitch}</div>
       )}
 
       <AiProvider lessonId={lesson.id} enabled={aiEnabled && !readOnly}>
@@ -150,8 +147,9 @@ export function LessonWorkspace({ initial, tab, readOnly, copyable, game, aiEnab
             <div className="flex flex-col gap-6">
               {mode === "edit" ? (
                 <>
-                  <SlideEditor pkg={lesson} onChange={update} />
                   <DownloadPptxButton pkg={lesson} />
+                  <div className={barClass}>{modeSwitch}</div>
+                  <SlideEditor pkg={lesson} onChange={update} />
                 </>
               ) : (
                 <>
@@ -171,16 +169,22 @@ export function LessonWorkspace({ initial, tab, readOnly, copyable, game, aiEnab
                     </section>
                   )}
                   {!readOnly && (
-                    <section>
-                      <h2 className="mb-3 text-title3 font-semibold">{t.lesson.chooseTemplate}</h2>
+                    <section className="flex flex-col gap-3">
+                      <h2 className="text-title3 font-semibold">{t.lesson.chooseLook}</h2>
+                      <LookPicker pkg={lesson} onChange={update} />
+                    </section>
+                  )}
+                  {!readOnly && (
+                    <section className="grid max-w-3xl gap-2 sm:grid-cols-2">
                       <TemplatePicker
-                        pkg={lesson}
-                        value={getTemplate(lesson.templateId, lesson.subject, lesson.deckType).id}
+                        value={templateOf(lesson).id}
                         onChange={(templateId) => update({ ...lesson, templateId })}
                       />
+                      <FontPicker value={lesson.font} onChange={(font) => update({ ...lesson, font })} />
                     </section>
                   )}
                   <DownloadPptxButton pkg={lesson} />
+                  {!readOnly && <div className={barClass}>{modeSwitch}</div>}
                   <SlidePreview pkg={lesson} />
                 </>
               )}

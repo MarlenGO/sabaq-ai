@@ -19,9 +19,11 @@ export interface Box {
 
 export type SlideElement =
   /** rounded: true — скруглённые углы, "full" — круг/овал; color — свой цвет (hex) вместо цвета шаблона */
-  | (Box & { type: "rect"; fill: ColorRole; rounded?: boolean | "full"; color?: string })
+  /** line — тонкая рамка этого цвета (hex) */
+  | (Box & { type: "rect"; fill: ColorRole; rounded?: boolean | "full"; color?: string; line?: string })
   | (Box & { type: "circle"; color: string; transparency: number })
-  | (Box & { type: "icon"; name: IconName; color: ColorRole })
+  /** hex — свой цвет вместо цвета шаблона (как у rect) */
+  | (Box & { type: "icon"; name: IconName; color: ColorRole; hex?: string })
   /**
    * Картинка. С src — настоящее фото (из Wikimedia, с подписью автора credit).
    * Без src — место под картинку: в PowerPoint учитель нажимает на значок и выбирает фото.
@@ -41,7 +43,24 @@ export type SlideElement =
       /** Заголовок слайда: по нему вид презентации добавляет своё оформление (designs.ts) */
       role?: "heading";
       valign?: "top" | "middle" | "bottom";
+      italic?: boolean;
+      /** Свой цвет (hex) вместо цвета шаблона */
+      hex?: string;
+      /** Свой шрифт вместо шрифта шаблона (у оформления «Белес») */
+      face?: string;
     });
+
+/** Цвет текста или иконки: свой hex, если задан, иначе цвет шаблона */
+export const colorOf = (el: { color: ColorRole; hex?: string }, template: SlideTemplate) => el.hex ?? template.colors[el.color];
+
+/** Смешать два цвета hex (без «#»): t = 0 — первый, 1 — второй */
+export function mix(a: string, b: string, t: number) {
+  const ch = (c: string, i: number) => parseInt(c.slice(i, i + 2), 16);
+  return [0, 2, 4]
+    .map((i) => Math.round(ch(a, i) * (1 - t) + ch(b, i) * t).toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase();
+}
 
 // Подбор размера шрифта: грубо оцениваем, сколько строк займёт текст в рамке,
 // и уменьшаем шрифт, пока не влезет. Средний символ ≈ 0,55 от размера шрифта.

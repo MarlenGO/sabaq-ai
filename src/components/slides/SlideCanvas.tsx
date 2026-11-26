@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { SLIDE_W_PT, type Slide, type SlideElement } from "@/slides/layout";
 import { iconDataUrl } from "@/slides/icons";
 import type { SlideTemplate } from "@/slides/templates";
+import { colorOf } from "@/slides/elements";
 
 // «Художник» для браузера: рисует слайд из той же раскладки, что и PPTX.
 // Размеры в cqw (процент ширины слайда): 1 пункт = 100 / 720 cqw,
@@ -22,6 +23,8 @@ function Element({ el, template }: { el: SlideElement; template: SlideTemplate }
           ...boxStyle(el),
           background: hex(el.color ?? template.colors[el.fill]),
           borderRadius: el.rounded === "full" ? "50%" : el.rounded ? pt(10) : undefined,
+          border: el.line ? `${pt(0.75)} solid ${hex(el.line)}` : undefined,
+          boxSizing: "border-box",
         }}
       />
     );
@@ -29,7 +32,7 @@ function Element({ el, template }: { el: SlideElement; template: SlideTemplate }
 
   if (el.type === "icon") {
     // eslint-disable-next-line @next/next/no-img-element -- иконка из data:-URL, оптимизация next/image не нужна
-    return <img src={iconDataUrl(el.name, template.colors[el.color])} alt="" style={boxStyle(el)} />;
+    return <img src={iconDataUrl(el.name, colorOf(el, template))} alt="" style={boxStyle(el)} />;
   }
 
   if (el.type === "image" && el.src) {
@@ -102,8 +105,9 @@ function Element({ el, template }: { el: SlideElement; template: SlideTemplate }
         flexDirection: "column",
         justifyContent: el.valign === "middle" ? "center" : el.valign === "bottom" ? "flex-end" : "flex-start",
         textAlign: el.align ?? "left",
-        color: hex(template.colors[el.color]),
-        fontFamily: el.font === "heading" ? template.fonts.heading : template.fonts.body,
+        color: hex(colorOf(el, template)),
+        fontFamily: el.face ? `${el.face}, ${template.fonts.body}` : el.font === "heading" ? template.fonts.heading : template.fonts.body,
+        fontStyle: el.italic ? "italic" : undefined,
         fontSize: pt(el.fontSize),
         fontWeight: el.bold ? 700 : 400,
         lineHeight: 1.2,

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { TopicPackage } from "@/types/topic-package";
 import { exportPptx, pptxFileName } from "@/slides/export-pptx";
-import { getTemplate } from "@/slides/templates";
+import { templateOf } from "@/slides/templates";
 import { track } from "@/lib/track";
 import { Button } from "@/components/ui/Button";
 import { useT } from "@/i18n/client";
@@ -17,7 +17,7 @@ export function DownloadPptxButton({ pkg }: { pkg: TopicPackage }) {
     try {
       await exportPptx(pkg);
       setState("done");
-      track({ type: "pptx", lessonId: pkg.id, templateId: getTemplate(pkg.templateId, pkg.subject, pkg.deckType).id });
+      track({ type: "pptx", lessonId: pkg.id, templateId: templateOf(pkg).id });
     } catch (error) {
       console.error(error);
       setState("error");

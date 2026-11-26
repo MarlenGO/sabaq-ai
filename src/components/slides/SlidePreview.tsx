@@ -2,13 +2,13 @@
 
 import type { TopicPackage } from "@/types/topic-package";
 import { buildSlides } from "@/slides/layout";
-import { getTemplate } from "@/slides/templates";
+import { templateOf } from "@/slides/templates";
 import { SlideCanvas } from "./SlideCanvas";
 import { useT } from "@/i18n/client";
 
 // Все слайды урока: первый крупно, остальные сеткой по два.
 export function SlidePreview({ pkg }: { pkg: TopicPackage }) {
-  const template = getTemplate(pkg.templateId, pkg.subject, pkg.deckType);
+  const template = templateOf(pkg);
   const slides = buildSlides(pkg, template);
   const t = useT();
 
