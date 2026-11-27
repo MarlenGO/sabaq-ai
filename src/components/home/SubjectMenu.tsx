@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
+import { History } from "lucide-static";
 import type { Subject } from "@/types/topic-package";
 import { deckTypeOrder } from "@/slides/structures";
 import { games } from "@/games/registry";
@@ -67,14 +68,14 @@ export function SubjectMenu({ subject }: { subject: Subject }) {
 
       <div className="mt-8 grid items-start gap-8 lg:grid-cols-2 xl:grid-cols-3">
         {docs.length > 0 && (
-          <List title={t.docs.title} hint={t.docs.hint}>
+          <List title={t.docs.title} hint={t.docs.hint} history="document">
             {docs.map((item) => (
               <Row key={item.id} item={item} href={`/subject/${subject}/${docPath(item.id)}`} />
             ))}
           </List>
         )}
         {decks.length > 0 && (
-          <List title={t.subject.presentations} hint={t.subject.presentationsHint}>
+          <List title={t.subject.presentations} hint={t.subject.presentationsHint} history="lesson">
             {decks.map((item) => (
               <CreateRow
                 key={item.id}
@@ -88,7 +89,7 @@ export function SubjectMenu({ subject }: { subject: Subject }) {
           </List>
         )}
         {gameItems.length > 0 && (
-          <List title={t.subject.games} hint={t.subject.gamesHint}>
+          <List title={t.subject.games} hint={t.subject.gamesHint} history="game">
             {gameItems.map((item) => (
               <CreateRow
                 key={item.id}
@@ -109,10 +110,21 @@ export function SubjectMenu({ subject }: { subject: Subject }) {
 
 // Без overflow-hidden у списка: иначе всплывающие списки формы обрезаются краем листа.
 // Поэтому углы скругляем сами — у первой и последней строки.
-function List({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
+// Справа от заголовка — «Тарих»: история, сразу отфильтрованная по этой колонке
+function List({ title, hint, history, children }: { title: string; hint: string; history: string; children: ReactNode }) {
+  const t = useT();
   return (
     <section>
-      <h2 className="text-title2 font-extrabold tracking-tight">{title}</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-title2 font-extrabold tracking-tight">{title}</h2>
+        <Link
+          href={`/history?show=${history}`}
+          className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl px-3 text-subhead font-semibold text-accent hover:bg-accent/10"
+        >
+          <LucideIcon svg={History} className="size-5" />
+          {t.nav.history}
+        </Link>
+      </div>
       <p className="mt-0.5 text-subhead text-label-2">{hint}</p>
       <ul className="mt-4 divide-y divide-separator rounded-3xl bg-surface *:first:rounded-t-3xl *:last:rounded-b-3xl">{children}</ul>
     </section>
