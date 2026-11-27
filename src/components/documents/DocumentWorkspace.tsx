@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import type { Language, Subject } from "@/types/topic-package";
-import { docSchemas, lessonTypes, planTypes, testCounts, type DocData, type DocKind, type DocumentRequest } from "@/types/documents";
+import { docSchemas, lessonTypes, planTypes, testCounts, type DocData, type DocFields, type DocKind, type DocumentRequest, type MyDocument } from "@/types/documents";
 import { docIcon } from "@/data/catalog";
 import { buildDocument, docTitle } from "@/documents/render";
 import { toHtmlBody, toPrintPage } from "@/documents/html";
@@ -68,8 +68,11 @@ const emptyDraft: Draft = {
 };
 /** Поля ҚМЖ, которые учитель пишет сам: и в запросе, и в адресе из «Тарих» */
 const kmzhFields = ["section", "objective", "textbook", "value", "planType", "lessonType"] as const;
-/** Последний документ AI: для какой темы/класса/языка (for) и сам текст */
-const noResult = { for: "", data: null as unknown };
+/** Последний документ AI: для какой темы/класса/языка (for), сам текст и его id в «Менің құжаттарым» */
+const noResult = { for: "", data: null as unknown, docId: "" };
+/** Пауза перед автосохранением: учитель допечатывает слово — запрос один */
+const SAVE_DELAY = 800;
+type SaveState = "idle" | "saving" | "saved" | "error";
 /** Классы 6–11: сайт для средней и старшей школы, все помещаются в одну строку */
 const grades = [6, 7, 8, 9, 10, 11];
 /** Названия предметов в документе — на языке документа, а не сайта */
@@ -105,6 +108,24 @@ export function DocumentWorkspace({ subject, kind }: { subject: Subject; kind: D
       isKmzh ? `|${kmzhFields.map((f) => d[f].trim().toLowerCase()).join("|")}${d.taskCount === 4 ? "|t4" : ""}` : ""
     }`;
   const requestKey = keyOf(draft);
+  /** Поля формы для «Менің құжаттарым» (сохраняются вместе с ответом AI) */
+  const fieldsOf = (d: Draft): DocFields => ({
+    subject,
+    topic: d.topic.trim(),
+    grade: d.grade,
+    language: d.language,
+    count: d.count,
+    section: d.section.trim(),
+    objective: d.objective.trim(),
+    textbook: d.textbook.trim(),
+    value: d.value.trim(),
+    planType: d.planType,
+    lessonType: d.lessonType,
+    taskCount: d.taskCount,
+    teacher: d.teacher.trim(),
+    school: d.school.trim(),
+    date: d.date.trim(),
+  });
 
   // Сохранённый документ мог остаться от старой версии схемы — проверяем
   const saved = useMemo(() => {
@@ -144,11 +165,32 @@ export function DocumentWorkspace({ subject, kind }: { subject: Subject; kind: D
       });
   const body = toHtmlBody(isKmzh ? kmzhPreview(kmzh, suggested) : doc);
 
+  // Автосохранение в «Менің құжаттарым»: поля формы уходят на сервер через 800 мс после правки,
+  // пока лист справа — этот документ (тему поменяли — это уже другой документ, его надо создать)
+  const savedFields = useRef("");
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const docId = useSaved ? (result.docId ?? "") : "";
+  const fieldsJson = JSON.stringify(fieldsOf(draft));
+  useEffect(() => {
+    if (!docId || fieldsJson === savedFields.current) return;
+    const timer = setTimeout(async () => {
+      setSaveState("saving");
+      const response = await fetch(`/api/documents/${docId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fields: JSON.parse(fieldsJson) }),
+      }).catch(() => null);
+      if (response?.ok) savedFields.current = fieldsJson;
+      setSaveState(response?.ok ? "saved" : "error");
+    }, SAVE_DELAY);
+    return () => clearTimeout(timer);
+  }, [docId, fieldsJson]);
+
   /** afterwards — что сделать после удачного ответа (отметить урок в «Жоспар») */
   const generate = (from: Draft = draft, again = false, afterwards?: () => Promise<unknown>) =>
     startTransition(async () => {
       setError(null);
-      const { topic, grade, language, count, section, objective, textbook, value, planType, lessonType, taskCount } = from;
+      const { topic, grade, language, count, section, objective, textbook, value, planType, lessonType, taskCount, teacher, school, date } = from;
       setOldFormat(false);
       const response = await fetch("/api/documents", {
         method: "POST",
@@ -167,12 +209,19 @@ export function DocumentWorkspace({ subject, kind }: { subject: Subject; kind: D
           planType,
           lessonType,
           taskCount,
+          teacher,
+          school,
+          date,
           again,
         }),
       }).catch(() => null);
       const data = await response?.json().catch(() => null);
       if (response?.ok && data?.data) {
-        setResult({ for: keyOf(from), data: data.data });
+        // Новый документ сразу лежит в «Менің құжаттарым» (docId); из «Тарих» (again) — прежний id, если был
+        const docId = typeof data.docId === "string" ? data.docId : again && result.for === keyOf(from) ? result.docId : "";
+        savedFields.current = JSON.stringify(fieldsOf(from));
+        setSaveState(docId ? "saved" : "idle");
+        setResult({ for: keyOf(from), data: data.data, docId });
         await afterwards?.().catch(() => {});
       } else setError(data?.error ?? t.form.netError);
     });
@@ -220,6 +269,37 @@ export function DocumentWorkspace({ subject, kind }: { subject: Subject; kind: D
     // Только при открытии из истории
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromHistory]);
+
+  // Открыт из «Менің құжаттарым» (?doc=id): поля формы и ответ AI — с сервера, с правками учителя
+  const openDoc = params.get("doc");
+  const [opening, startOpening] = useTransition();
+  useEffect(() => {
+    if (!openDoc) return;
+    router.replace(pathname);
+    startOpening(async () => {
+      setError(null);
+      setOldFormat(false);
+      const response = await fetch(`/api/documents/${openDoc}`).catch(() => null);
+      const data = await response?.json().catch(() => null);
+      if (!response?.ok || !data?.fields) {
+        setError(data?.error ?? t.form.netError);
+        return;
+      }
+      const { fields, content } = data as MyDocument;
+      const next: Draft = {
+        ...emptyDraft,
+        ...fields,
+        mode: "ai",
+        grade: grades.includes(fields.grade) ? fields.grade : 7,
+      };
+      setDraft(next);
+      savedFields.current = JSON.stringify(fieldsOf(next));
+      setSaveState("saved");
+      setResult({ for: keyOf(next), data: content, docId: openDoc });
+    });
+    // Только при открытии из списка
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openDoc]);
 
   // «ҚМЖ - Тақырып»: у ҚМЖ на обоих языках сайта приставка «ҚМЖ»
   const fileName = `${isKmzh ? "ҚМЖ" : title} - ${draft.topic.trim() || t.docs.document}`.replace(/[\\/:*?"<>|]+/g, " ").slice(0, 90);
@@ -460,6 +540,16 @@ export function DocumentWorkspace({ subject, kind }: { subject: Subject; kind: D
             <FileButton label="Word" title={t.docs.word} onClick={downloadWord} />
             <FileButton label="PDF" title={t.docs.print} onClick={print} />
           </div>
+          {docId && (
+            <p className="flex flex-wrap items-center gap-x-2 px-1 text-footnote text-label-2" aria-live="polite">
+              <Link href="/documents" className="font-semibold text-accent hover:opacity-70">
+                {t.docs.savedTo}
+              </Link>
+              {saveState === "saving" && <span>· {t.docs.saving}</span>}
+              {saveState === "saved" && <span>· {t.docs.savedOk}</span>}
+              {saveState === "error" && <span className="text-red">· {t.docs.saveError}</span>}
+            </p>
+          )}
           {error && (
             <div role="alert" className="rounded-2xl bg-red/10 p-4 text-subhead text-red">
               {error}
@@ -479,11 +569,12 @@ export function DocumentWorkspace({ subject, kind }: { subject: Subject; kind: D
             </Button>
           </div>
         )}
-        {draft.mode === "ai" && !useSaved && !oldFormat && (
+        {opening && <p className="mb-3 rounded-2xl bg-accent/10 px-4 py-3 text-subhead text-accent">{t.docs.loadingDoc}</p>}
+        {draft.mode === "ai" && !useSaved && !oldFormat && !opening && (
           <p className="mb-3 rounded-2xl bg-accent/10 px-4 py-3 text-subhead text-accent">{stale ? t.docs.stale : t.docs.previewHint}</p>
         )}
         {/* Лист бумаги: всегда белый с чёрным текстом, и в тёмной теме — как будет на печати */}
-        <Sheet landscape={doc.landscape} html={body} dim={loading} />
+        <Sheet landscape={doc.landscape} html={body} dim={loading || opening} />
       </section>
     </div>
   );

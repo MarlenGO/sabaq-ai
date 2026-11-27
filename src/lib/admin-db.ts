@@ -9,6 +9,7 @@ import { documentRequestSchema } from "@/types/documents";
 export const dbTables = [
   "ai_cache",
   "lessons",
+  "documents",
   "plans",
   "activity",
   "ai_usage",

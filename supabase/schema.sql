@@ -143,6 +143,23 @@ create table if not exists plans (
 );
 create index if not exists plans_owner on plans (owner_id, updated_at desc);
 
+-- «Менің құжаттарым»: у каждого учителя своя копия каждого документа (ҚМЖ, тест, БЖБ, PISA,
+-- жұмыс парағы) в JSON: data = { fields: поля формы, content: ответ AI }. Файлы .docx не храним —
+-- Word собирается из JSON при скачивании. Чистка кэша AI и «Тарих» эту таблицу не трогает.
+create table if not exists documents (
+  id text primary key,
+  owner_id uuid not null references users on delete cascade,
+  kind text not null,
+  subject text not null,
+  topic text not null,
+  grade integer not null,
+  language text not null,
+  data jsonb not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists documents_owner on documents (owner_id, updated_at desc);
+
 alter table users enable row level security;
 alter table sessions enable row level security;
 alter table login_links enable row level security;
@@ -155,6 +172,7 @@ alter table answers enable row level security;
 alter table activity enable row level security;
 alter table ai_usage enable row level security;
 alter table plans enable row level security;
+alter table documents enable row level security;
 
 -- Размер таблиц для вкладки «БД» в админке (вызывается через REST: rpc/db_sizes).
 -- Только для секретного ключа сервера: у anon и authenticated права нет.

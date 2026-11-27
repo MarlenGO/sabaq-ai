@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { docSchemas, documentRequestSchema, type DocData, type DocKind } from "@/types/documents";
+import { docFieldsSchema, docSchemas, documentRequestSchema, type DocData, type DocKind } from "@/types/documents";
 import { generateDocument } from "@/lib/ai/generate";
 import { hasAiKey } from "@/lib/ai/gemini";
 import { apiError, errorResponse } from "@/lib/api-errors";
@@ -8,6 +8,7 @@ import { emptyDocument } from "@/documents/empty";
 import { documentKey, getCachedDocument, putCachedDocument } from "@/lib/storage/documents";
 import { hasQuota, tracked } from "@/lib/storage/usage";
 import { appendActivity } from "@/lib/storage/activity";
+import { createDocument, listDocuments } from "@/lib/storage/my-documents";
 import { emptyKmzh, kmzhAiSchema, kmzhDocSchema } from "@/lib/kmzh/schema";
 import { generateKmzh } from "@/lib/kmzh/generate";
 import { fillKmzh } from "@/lib/kmzh/fill";
@@ -15,8 +16,20 @@ import { fillKmzh } from "@/lib/kmzh/fill";
 // Работает в Node.js (по умолчанию): шаблон Word читаем с диска
 export const maxDuration = 60; // ҚМЖ пишется 10–30 секунд
 
+// GET /api/documents — список «Менің құжаттарым» (страница перечитывает его при каждом показе)
+export async function GET() {
+  const user = await currentUser();
+  if (!user) return apiError("unauthorized", 401);
+  try {
+    return Response.json({ documents: await listDocuments(user.id) });
+  } catch (error) {
+    return await errorResponse(error);
+  }
+}
+
 // POST /api/documents — написать документ (ҚМЖ, тест, БЖБ) по теме.
-// Сам документ у учителя не храним: в «Тарих» пишем, по чему его найти в кэше.
+// В «Тарих» пишем, по чему его найти в кэше, а копию с полями формы — в «Менің құжаттарым»
+// (таблица documents, дальше автосохранение PUT /api/documents/[id]).
 // Ответ AI кладём в общий кэш, чтобы та же тема у другого учителя была мгновенной.
 // { word: ҚМЖ } — собрать готовый ҚМЖ в Word по шаблону (без AI): тот же JSON, что на листе.
 export async function POST(request: Request) {
@@ -51,7 +64,11 @@ export async function POST(request: Request) {
     const data = cached ?? (await hasQuota(user) ? await tracked(user.id, "document", generate) : null);
     if (!data) return apiError("dailyLimit", 429);
     if (!cached) await putCachedDocument(key, data);
+    let docId: string | null = null;
     if (!req.again) {
+      // Своя копия учителя. Если таблицы ещё нет (SQL не запущен) — документ всё равно отдаём
+      const fields = docFieldsSchema.safeParse({ ...body, ...req });
+      if (fields.success) docId = await createDocument(user.id, req.kind, fields.data, data).catch(() => null);
       const { kind: docKind, subject, topic, grade, language, count, section, objective, textbook, value, planType, lessonType, taskCount } = req;
       await appendActivity(user.id, {
         type: "document",
@@ -66,7 +83,7 @@ export async function POST(request: Request) {
         ...(isKmzh ? { v: 2, section, objective, textbook, value, planType, lessonType, taskCount } : {}),
       });
     }
-    return Response.json({ data, source: "ai", cached: Boolean(cached) });
+    return Response.json({ data, source: "ai", cached: Boolean(cached), docId });
   } catch (error) {
     return await errorResponse(error);
   }

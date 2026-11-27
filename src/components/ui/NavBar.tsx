@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { subjectSchema } from "@/types/topic-package";
-import { CalendarDays, History, LayoutGrid, LogOut, ShieldCheck, Wrench } from "lucide-static";
+import { CalendarDays, FolderOpen, History, LayoutGrid, LogOut, ShieldCheck, Wrench } from "lucide-static";
 import { getT } from "@/i18n/server";
 import { currentUser } from "@/lib/auth";
 import { InstallButton } from "@/components/ui/InstallButton";
@@ -19,6 +19,7 @@ export async function NavBar() {
   const items: NavItem[] = user
     ? [
         { href: "/", label: t.nav.subjects, icon: LayoutGrid },
+        { href: "/documents", label: t.nav.myDocs, icon: FolderOpen },
         { href: "/plan", label: t.nav.plan, icon: CalendarDays },
         { href: "/tools", label: t.nav.tools, icon: Wrench },
         { href: "/history", label: t.nav.history, icon: History },
