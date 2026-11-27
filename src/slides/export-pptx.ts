@@ -2,7 +2,8 @@ import type PptxGenJS from "pptxgenjs";
 import type { TopicPackage } from "@/types/topic-package";
 import { buildSlides, SLIDE_H_PT, SLIDE_W_PT, type SlideElement } from "./layout";
 import { iconSvg, rasterizeInBrowser, type Rasterize } from "./icons";
-import { getTemplate, type SlideTemplate } from "./templates";
+import { templateOf, type SlideTemplate } from "./templates";
+import { colorOf } from "./elements";
 
 // «Художник» для PowerPoint: рисует те же элементы, что SlideCanvas, через pptxgenjs.
 // Файл собирается прямо в браузере, сервер и AI для этого не нужны.
@@ -18,7 +19,7 @@ function draw(pptx: PptxGenJS, slide: Slide, el: SlideElement, template: SlideTe
 
   if (el.type === "rect") {
     if (el.rounded === "full") {
-      slide.addShape(pptx.ShapeType.ellipse, { ...box, fill: { color: el.color ?? template.colors[el.fill] }, line: { type: "none" } });
+      slide.addShape(pptx.ShapeType.ellipse, { ...box, fill: { color: el.color ?? template.colors[el.fill] }, line: el.line ? { color: el.line, width: 0.75 } : { type: "none" } });
       return;
     }
     // Радиус 10 пт как в превью. pptxgenjs принимает его долей от короткой стороны
@@ -27,7 +28,7 @@ function draw(pptx: PptxGenJS, slide: Slide, el: SlideElement, template: SlideTe
     slide.addShape(el.rounded ? pptx.ShapeType.roundRect : pptx.ShapeType.rect, {
       ...box,
       fill: { color: el.color ?? template.colors[el.fill] },
-      line: { type: "none" },
+      line: el.line ? { color: el.line, width: 0.75 } : { type: "none" },
       rectRadius: el.rounded ? Math.min(0.5, 10 / shortSidePt) : undefined,
     });
     return;
@@ -43,7 +44,7 @@ function draw(pptx: PptxGenJS, slide: Slide, el: SlideElement, template: SlideTe
   }
 
   if (el.type === "icon") {
-    const data = icons.get(iconKey(el.name, template.colors[el.color]));
+    const data = icons.get(iconKey(el.name, colorOf(el, template)));
     if (data) slide.addImage({ ...box, data });
     return;
   }
@@ -84,10 +85,11 @@ function draw(pptx: PptxGenJS, slide: Slide, el: SlideElement, template: SlideTe
     })),
     {
       ...box,
-      fontFace: el.font === "heading" ? template.fonts.heading : template.fonts.body,
+      fontFace: el.face ?? (el.font === "heading" ? template.fonts.heading : template.fonts.body),
       fontSize: el.fontSize,
-      color: template.colors[el.color],
+      color: colorOf(el, template),
       bold: el.bold,
+      italic: el.italic,
       align: el.align ?? "left",
       valign: el.valign ?? "top",
       margin: 0,
@@ -115,14 +117,14 @@ export async function buildPptx(
   pptx.layout = "LAYOUT_16x9";
   pptx.title = pkg.topic;
 
-  const t = template ?? getTemplate(pkg.templateId, pkg.subject, pkg.deckType);
+  const t = template ?? templateOf(pkg);
   const slides = buildSlides(pkg, t);
 
   // Каждую иконку каждого цвета превращаем в PNG один раз
   const icons = new Map<string, string>();
   for (const el of slides.flatMap((s) => s.elements)) {
     if (el.type !== "icon") continue;
-    const color = t.colors[el.color];
+    const color = colorOf(el, t);
     const key = iconKey(el.name, color);
     if (!icons.has(key)) icons.set(key, await rasterize(iconSvg(el.name, color)));
   }

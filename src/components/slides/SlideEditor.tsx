@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import type { TopicPackage } from "@/types/topic-package";
 import { buildSlides } from "@/slides/layout";
-import { getTemplate } from "@/slides/templates";
+import { templateOf } from "@/slides/templates";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ArrowLeftIcon, ChevronRightIcon } from "@/components/ui/Icons";
@@ -11,14 +11,15 @@ import { useT } from "@/i18n/client";
 import { SlideCanvas } from "./SlideCanvas";
 import { SlideFields, slideAiPart } from "./SlideFields";
 import { AiButton } from "@/components/lesson/AiButton";
-import { FillDeckButton } from "./DeckTypePicker";
+import { TemplatePicker } from "./TemplatePicker";
+import { FontPicker } from "./FontPicker";
 import type { AiPart } from "@/types/ai";
 
 // Конструктор презентации по слайдам, как в PowerPoint: слева (на телефоне — сверху)
 // маленькие слайды, справа выбранный слайд крупно и поля именно этого слайда.
 export function SlideEditor({ pkg, onChange }: { pkg: TopicPackage; onChange: (pkg: TopicPackage) => void }) {
   const t = useT();
-  const template = getTemplate(pkg.templateId, pkg.subject, pkg.deckType);
+  const template = templateOf(pkg);
   const slides = buildSlides(pkg, template);
   const [selected, setSelected] = useState(0);
   // Если факты удалили и слайдов стало меньше — остаёмся на последнем
@@ -69,6 +70,7 @@ export function SlideEditor({ pkg, onChange }: { pkg: TopicPackage; onChange: (p
             <AiButton
               key={index}
               wide
+              label={t.ai.fillSlide}
               request={{ part: slide.kind as AiPart, slide: slide.id }}
               current={aiPart.get(pkg)}
               apply={(value) => onChange(aiPart.set(pkg, value as never))}
@@ -79,7 +81,12 @@ export function SlideEditor({ pkg, onChange }: { pkg: TopicPackage; onChange: (p
         <SlideCanvas slide={slide} template={template} />
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-subhead text-label-2">{t.deck.hint}</p>
-          <FillDeckButton pkg={pkg} onChange={onChange} />
+          <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-2">
+            <div className="sm:min-w-72">
+              <TemplatePicker value={template.id} onChange={(templateId) => onChange({ ...pkg, templateId })} />
+            </div>
+            <FontPicker value={pkg.font} onChange={(font) => onChange({ ...pkg, font })} />
+          </div>
         </div>
         <Card className="p-4 sm:p-6">
           <SlideFields slideId={slide.id} kind={slide.kind} pkg={pkg} onChange={onChange} />

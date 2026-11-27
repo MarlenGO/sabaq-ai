@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { HistoryEntry } from "@/types/history";
 import { dayKey, dayLabel, timeOf } from "@/lib/dates";
 import { Card } from "@/components/ui/Card";
@@ -26,7 +27,14 @@ const filters: { value: Filter; label: (t: Messages) => string }[] = [
 ];
 
 export function HistoryList({ entries, today, yesterday }: { entries: HistoryEntry[]; today: string; yesterday: string }) {
-  const [filter, setFilter] = useState<Filter>("all");
+  // Фильтр живёт в адресе (?show=game), чтобы со страницы предмета можно было
+  // открыть историю сразу с нужным фильтром
+  const router = useRouter();
+  const pathname = usePathname();
+  const show = useSearchParams().get("show");
+  const filter: Filter = filters.some((f) => f.value === show) ? (show as Filter) : "all";
+  const setFilter = (value: Filter) =>
+    router.replace(value === "all" ? pathname : `${pathname}?show=${value}`, { scroll: false });
   const [query, setQuery] = useState("");
   const t = useT();
   const selection = useHistorySelection("/api/history/delete");

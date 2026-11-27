@@ -141,6 +141,23 @@ export const deckTypeSchema = z.enum(["lesson", "open-lesson", "report", "talk",
 // учитель может дописать их в PowerPoint.
 const line = z.string().max(400);
 const lines = z.array(line).min(limits.deckLines[0]).max(limits.deckLines[1]);
+/** Оформления слайдов: classic — прежнее простое, остальные — slides/looks.ts */
+export const lookSchema = z.enum(["classic", "beles", "syzba", "journal", "mosaic", "official", "attest", "method"]);
+export type LookId = z.infer<typeof lookSchema>;
+
+/** Шрифты слайдов, в которых есть все казахские буквы и которые стоят в Windows/Office у учителя */
+export const fontSchema = z.enum([
+  "Times New Roman",
+  "Cambria",
+  "Palatino Linotype",
+  "Arial",
+  "Calibri",
+  "Segoe UI",
+  "Verdana",
+  "Tahoma",
+]);
+export type SlideFont = z.infer<typeof fontSchema>;
+
 export const layoutSchemas = {
   title: z.object({ kicker: line, author: line }),
   goals: z.object({ title: line, items: z.array(z.object({ title: line, body: line })).length(3) }),
@@ -196,6 +213,10 @@ export const topicPackageSchema = packageContentSchema.extend({
   deck: deckSchema.optional(),
   /** Вид презентации; если нет — урок */
   deckType: deckTypeSchema.optional(),
+  /** Оформление слайдов (элементы и раскладка, slides/looks.ts); если нет — по виду презентации */
+  look: lookSchema.optional(),
+  /** Шрифт всех слайдов; если нет — шрифты дизайна */
+  font: fontSchema.optional(),
 });
 
 export type Language = z.infer<typeof languageSchema>;

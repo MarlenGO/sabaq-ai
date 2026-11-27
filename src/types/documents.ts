@@ -144,3 +144,29 @@ export const documentRequestSchema = lessonRequestSchema.pick({ topic: true, gra
   again: z.boolean().optional(),
 });
 export type DocumentRequest = z.infer<typeof documentRequestSchema>;
+
+/** Поля формы слева у сохранённого документа («Менің құжаттарым»): запрос + шапка листа */
+export const docFieldsSchema = documentRequestSchema.omit({ kind: true, again: true }).extend({
+  teacher: z.string().max(200).default(""),
+  school: z.string().max(300).default(""),
+  date: z.string().max(60).default(""),
+});
+export type DocFields = z.infer<typeof docFieldsSchema>;
+
+/** Документ учителя в базе: вид, поля формы и ответ AI (файл Word собирается из этого при скачивании) */
+export interface MyDocument {
+  id: string;
+  kind: DocKind;
+  fields: DocFields;
+  content: unknown;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Строка списка «Менің құжаттарым» — без самого документа, чтобы список грузился быстро */
+export type MyDocumentItem = Omit<MyDocument, "fields" | "content"> & {
+  subject: DocFields["subject"];
+  topic: string;
+  grade: number;
+  language: DocFields["language"];
+};

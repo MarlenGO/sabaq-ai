@@ -9,7 +9,7 @@ import PptxGenJS from "pptxgenjs";
 import { newtonFirstLaw7 } from "../src/data/mock-packages/newton-first-law-7";
 import { buildPptx, pptxBytes } from "../src/slides/export-pptx";
 import { ICON_PX, type Rasterize } from "../src/slides/icons";
-import { templates } from "../src/slides/templates";
+import { lookOrder, templateOf } from "../src/slides/templates";
 import { deckTypeOrder } from "../src/slides/structures";
 
 const outDir = path.join(process.cwd(), "data", "samples");
@@ -22,17 +22,15 @@ const rasterize: Rasterize = async (svg) => {
 
 async function main() {
   await mkdir(outDir, { recursive: true });
-  for (const template of templates) {
-    const file = path.join(outDir, `sample-${template.id}.pptx`);
-    const pptx = await buildPptx(PptxGenJS, newtonFirstLaw7, rasterize, template);
-    await writeFile(file, await pptxBytes(pptx));
-    console.log("✓", file);
-  }
-  for (const deckType of deckTypeOrder) {
-    const file = path.join(outDir, `type-${deckType}.pptx`);
-    const pptx = await buildPptx(PptxGenJS, { ...newtonFirstLaw7, deckType }, rasterize, templates[0]);
-    await writeFile(file, await pptxBytes(pptx));
-    console.log("✓", file);
+  // Каждый дизайн — в каждом виде презентации
+  for (const look of lookOrder) {
+    for (const deckType of deckTypeOrder) {
+      const pkg = { ...newtonFirstLaw7, deckType, look };
+      const file = path.join(outDir, `${look}-${deckType}.pptx`);
+      const pptx = await buildPptx(PptxGenJS, pkg, rasterize, templateOf(pkg));
+      await writeFile(file, await pptxBytes(pptx));
+      console.log("✓", file);
+    }
   }
 }
 

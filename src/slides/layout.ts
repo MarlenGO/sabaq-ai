@@ -4,6 +4,8 @@ import { isDataSlide, slideData, structureOf, type ContentKind, type DataSlide }
 import type { SlideTemplate } from "./templates";
 import { fitFontSize, sq, type Box, type ColorRole, type SlideElement } from "./elements";
 import { designOf } from "./designs";
+import { lookSlides } from "./looks";
+import { lookOf } from "./templates";
 
 export { SLIDE_W_PT, SLIDE_H_PT, fitFontSize, type SlideElement } from "./elements";
 
@@ -89,6 +91,13 @@ export function buildSlides(pkg: TopicPackage, template: SlideTemplate): Slide[]
   const l = copy[pkg.language];
   // Вид презентации решает и набор слайдов (structures.ts), и оформление (designs.ts)
   const design = designOf(pkg.deckType);
+  // Новые оформления (looks.ts) рисуют слайды целиком сами — без рамок вида
+  const look = lookOf(pkg);
+  if (look !== "classic") {
+    return lookSlides(look, structureOf(pkg), isDataSlide, pkg, l, template).map(
+      ({ spec, title, elements }): Slide => ({ id: spec.id, kind: spec.kind, title, elements }),
+    );
+  }
   const pages = structureOf(pkg).flatMap((spec) => {
     const list = isDataSlide(spec) ? dataPages(spec, pkg, l, template) : contentPages(spec.kind as ContentKind, pkg, l);
     return list.map((page) => ({ spec, page }));

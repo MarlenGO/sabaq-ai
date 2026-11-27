@@ -1,4 +1,4 @@
-import type { DeckType, Subject } from "@/types/topic-package";
+import type { DeckType, LookId, Subject, TopicPackage } from "@/types/topic-package";
 
 // Шаблон презентации = цвета + шрифты + украшение. Раскладка слайдов общая
 // (src/slides/layout.ts), поэтому любая тема ложится в любой шаблон,
@@ -29,6 +29,70 @@ export interface SlideTemplate {
 }
 
 export const templates: SlideTemplate[] = [
+  // Цвета оформлений (looks.ts): при выборе оформления берутся эти
+  {
+    id: "beles",
+    name: "Көк пен сары",
+    description: "Қою көк пен сары",
+    colors: { background: "FFFFFF", surface: "EEF2F7", text: "1B2A44", muted: "5B6678", accent: "1B2A44", onAccent: "FFFFFF" },
+    fonts: { heading: "Times New Roman", body: "Times New Roman" },
+    decor: null,
+    detail: "F2A33A",
+  },
+  {
+    id: "syzba",
+    name: "Көгілдір мен маржан",
+    description: "Көгілдір мен маржан",
+    colors: { background: "FFFFFF", surface: "E3F3F3", text: "1F2933", muted: "5F6B76", accent: "0E7C86", onAccent: "FFFFFF" },
+    fonts: { heading: "Times New Roman", body: "Times New Roman" },
+    decor: null,
+    detail: "EF6F5E",
+  },
+  {
+    id: "journal",
+    name: "Жасыл мен қыша",
+    description: "Қою жасыл мен қыша сары",
+    colors: { background: "FFFFFF", surface: "E7EFE9", text: "1D1D1B", muted: "5E625C", accent: "14473A", onAccent: "FFFFFF" },
+    fonts: { heading: "Times New Roman", body: "Times New Roman" },
+    decor: null,
+    detail: "D39B1C",
+  },
+  {
+    id: "mosaic",
+    name: "Күлгін мозаика",
+    description: "Ақшыл күлгін, түрлі түсті плиткалар",
+    colors: { background: "F1F0FA", surface: "FFFFFF", text: "1E1B3A", muted: "5D5A78", accent: "3D3AA8", onAccent: "FFFFFF" },
+    fonts: { heading: "Times New Roman", body: "Times New Roman" },
+    decor: null,
+    detail: "FFA585",
+  },
+  {
+    id: "official",
+    name: "Ресми көк",
+    description: "Қою көк пен алтын — ресми",
+    colors: { background: "FFFFFF", surface: "F2F4F8", text: "1F2633", muted: "5E6675", accent: "1D2F5E", onAccent: "FFFFFF" },
+    fonts: { heading: "Times New Roman", body: "Times New Roman" },
+    decor: null,
+    detail: "B8913A",
+  },
+  {
+    id: "attest",
+    name: "Шие мен графит",
+    description: "Шие түс пен графит",
+    colors: { background: "FFFFFF", surface: "F3F4F6", text: "2B2F36", muted: "626872", accent: "7A1F2B", onAccent: "FFFFFF" },
+    fonts: { heading: "Times New Roman", body: "Times New Roman" },
+    decor: null,
+    detail: "B8913A",
+  },
+  {
+    id: "method",
+    name: "Сұр мен болат көк",
+    description: "Сұр-қара мен болат көк",
+    colors: { background: "FFFFFF", surface: "EEF3F5", text: "263238", muted: "5D6B72", accent: "263238", onAccent: "FFFFFF" },
+    fonts: { heading: "Times New Roman", body: "Times New Roman" },
+    decor: null,
+    detail: "1F6F8B",
+  },
   {
     id: "classic",
     name: "Классика",
@@ -223,4 +287,34 @@ const byDeckType: Partial<Record<DeckType, string>> = {
 export function getTemplate(id: string | undefined, subject: Subject, deckType?: DeckType): SlideTemplate {
   const fallback = (deckType && byDeckType[deckType]) ?? bySubject[subject];
   return templates.find((t) => t.id === id) ?? templates.find((t) => t.id === fallback) ?? templates[0];
+}
+
+/** Порядок дизайнов в выборе: сначала для уроков, потом официальные */
+export const lookOrder: Exclude<LookId, "classic">[] = ["beles", "syzba", "journal", "mosaic", "official", "attest", "method"];
+
+/** Оформление слайдов по умолчанию для вида презентации */
+const lookByDeckType: Record<DeckType, LookId> = {
+  lesson: "beles",
+  "open-lesson": "journal",
+  report: "official",
+  talk: "method",
+  "class-hour": "mosaic",
+  parents: "syzba",
+  attestation: "attest",
+};
+
+export const lookOf = (pkg: Pick<TopicPackage, "look" | "deckType">): LookId => pkg.look ?? lookByDeckType[pkg.deckType ?? "lesson"];
+
+/**
+ * Цвета презентации: выбранные учителем, иначе цвета оформления.
+ * У прежнего оформления (classic) — как раньше: по виду и предмету.
+ */
+export function templateOf(pkg: Pick<TopicPackage, "templateId" | "subject" | "deckType" | "look" | "font">): SlideTemplate {
+  const look = lookOf(pkg);
+  const base =
+    look === "classic"
+      ? getTemplate(pkg.templateId, pkg.subject, pkg.deckType)
+      : (templates.find((t) => t.id === pkg.templateId) ?? templates.find((t) => t.id === look) ?? templates[0]);
+  // Свой шрифт учителя — во всех текстах слайдов (дизайн иначе задаёт свои)
+  return pkg.font ? { ...base, fonts: { heading: pkg.font, body: pkg.font } } : base;
 }

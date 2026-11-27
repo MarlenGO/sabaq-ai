@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
+import { FolderOpen, History } from "lucide-static";
 import type { Subject } from "@/types/topic-package";
 import { deckTypeOrder } from "@/slides/structures";
 import { games } from "@/games/registry";
@@ -67,14 +68,14 @@ export function SubjectMenu({ subject }: { subject: Subject }) {
 
       <div className="mt-8 grid items-start gap-8 lg:grid-cols-2 xl:grid-cols-3">
         {docs.length > 0 && (
-          <List title={t.docs.title} hint={t.docs.hint}>
+          <List title={t.docs.title} hint={t.docs.hint} link={{ href: `/documents?subject=${subject}`, label: t.myDocs.link, icon: FolderOpen }}>
             {docs.map((item) => (
               <Row key={item.id} item={item} href={`/subject/${subject}/${docPath(item.id)}`} />
             ))}
           </List>
         )}
         {decks.length > 0 && (
-          <List title={t.subject.presentations} hint={t.subject.presentationsHint}>
+          <List title={t.subject.presentations} hint={t.subject.presentationsHint} link={{ href: "/history?show=lesson", label: t.nav.history, icon: History }}>
             {decks.map((item) => (
               <CreateRow
                 key={item.id}
@@ -88,7 +89,7 @@ export function SubjectMenu({ subject }: { subject: Subject }) {
           </List>
         )}
         {gameItems.length > 0 && (
-          <List title={t.subject.games} hint={t.subject.gamesHint}>
+          <List title={t.subject.games} hint={t.subject.gamesHint} link={{ href: "/history?show=game", label: t.nav.history, icon: History }}>
             {gameItems.map((item) => (
               <CreateRow
                 key={item.id}
@@ -109,10 +110,21 @@ export function SubjectMenu({ subject }: { subject: Subject }) {
 
 // Без overflow-hidden у списка: иначе всплывающие списки формы обрезаются краем листа.
 // Поэтому углы скругляем сами — у первой и последней строки.
-function List({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
+// Справа от заголовка — ссылка: у документов «Менің құжаттарым» по этому предмету,
+// у презентаций и игр «Тарих», сразу отфильтрованный по этой колонке
+function List({ title, hint, link, children }: { title: string; hint: string; link: { href: string; label: string; icon: string }; children: ReactNode }) {
   return (
     <section>
-      <h2 className="text-title2 font-extrabold tracking-tight">{title}</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-title2 font-extrabold tracking-tight">{title}</h2>
+        <Link
+          href={link.href}
+          className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-xl px-3 text-subhead font-semibold text-accent hover:bg-accent/10"
+        >
+          <LucideIcon svg={link.icon} className="size-5" />
+          {link.label}
+        </Link>
+      </div>
       <p className="mt-0.5 text-subhead text-label-2">{hint}</p>
       <ul className="mt-4 divide-y divide-separator rounded-3xl bg-surface *:first:rounded-t-3xl *:last:rounded-b-3xl">{children}</ul>
     </section>
